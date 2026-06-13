@@ -153,6 +153,25 @@ export default function EngagementSettings({
       triggerToast("Form Incomplete", "Please specify a notification title and message body.", "error");
       return;
     }
+
+    const newCampaign = {
+      id: `camp-${Date.now()}`,
+      title: notifTitle,
+      message: notifMessage,
+      segment: notifTarget || "All Registered Customers",
+      recipients: notifTarget === "riders" ? 42 : notifTarget === "restaurants" ? 18 : 154,
+      timestamp: new Date().toLocaleString()
+    };
+
+    try {
+      const saved = localStorage.getItem("googly_dispatched_campaigns");
+      const list = saved ? JSON.parse(saved) : [];
+      list.unshift(newCampaign);
+      localStorage.setItem("googly_dispatched_campaigns", JSON.stringify(list));
+    } catch (err) {
+      console.warn("Failed to persist dispatched campaigns:", err);
+    }
+
     setShowComposeSuccess(true);
   };
 

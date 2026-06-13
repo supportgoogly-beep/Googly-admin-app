@@ -61,6 +61,49 @@ export default function NotificationsSoundsManagement({
   // Active Subsection Index (Slack/Discord Sidebar Model)
   const [activeMenuSection, setActiveMenuSection] = useState<"overview" | "events" | "sounds" | "volume" | "templates" | "logs">("overview");
 
+  // Custom dispatched push campaigns state
+  const [campaigns, setCampaigns] = useState<Array<{
+    id: string;
+    title: string;
+    message: string;
+    segment: string;
+    recipients: number;
+    timestamp: string;
+  }>>(() => {
+    const saved = localStorage.getItem("googly_dispatched_campaigns");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      { id: "camp-1", title: "Weekend Surge Activated", message: "Surge pricing multiplier is now up to 1.5x in Salt Lake! Log in now to accept orders.", segment: "All Riders", recipients: 42, timestamp: "2026-06-12 18:30:00" },
+      { id: "camp-2", title: "FSSAI Compliance Notice", message: "Reminder: Please upload updated FSSAI certification to prevent suspension.", segment: "Partner Restaurants", recipients: 18, timestamp: "2026-06-11 11:15:00" },
+      { id: "camp-3", title: "Rain Alert - Save Extra!", message: "Heavy rainfall in Kolkata. Enjoy Free On-Time Delivery today only!", segment: "All Customers", recipients: 154, timestamp: "2026-06-10 14:02:11" }
+    ];
+  });
+
+  const [composerTitle, setComposerTitle] = useState("");
+  const [composerMessage, setComposerMessage] = useState("");
+  const [composerTarget, setComposerTarget] = useState("All Users");
+
+  useEffect(() => {
+    localStorage.setItem("googly_dispatched_campaigns", JSON.stringify(campaigns));
+  }, [campaigns]);
+
+  // Sync state when localstorage changes on other screens
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "googly_dispatched_campaigns" && e.newValue) {
+        try {
+          setCampaigns(JSON.parse(e.newValue));
+        } catch (err) {}
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
   // Filter Event Table State
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("All");
@@ -172,9 +215,6 @@ export default function NotificationsSoundsManagement({
 
   // Save Settings Workflow Confirmation Modal
   const [showSaveConfirmation, setShowSaveConfirmation] = useState<boolean>(false);
-
-  // Live Notification Simulator alert popup list
-  const [activeToastSimulators, setActiveToastSimulators] = useState<Array<{ id: string; title: string; message: string; eventName: string; soundPlayed: string; time: string }>>([]);
 
   // File Upload State
   const [dragOverActive, setDragOverActive] = useState<boolean>(false);
@@ -365,32 +405,7 @@ export default function NotificationsSoundsManagement({
     // Play synthesized sound
     playSyntheticSound(eventRow.soundAssigned);
 
-    // Assemble rich simulation card
-    const id = `toast-${Date.now()}`;
-    const newSim = {
-      id,
-      eventName: eventRow.name,
-      title: `⚡ SIMULATED STATUS: ${eventRow.name}`,
-      message: `${eventRow.description.substring(0, 95)}... | Channels: [${
-        [
-          eventRow.pushEnabled ? "PUSH" : null,
-          eventRow.emailEnabled ? "EMAIL" : null,
-          eventRow.smsEnabled ? "SMS" : null,
-          eventRow.whatsappEnabled ? "WHATSAPP" : null,
-          eventRow.inAppEnabled ? "IN-APP" : null,
-        ].filter(Boolean).join(", ")
-      }]`,
-      soundPlayed: eventRow.soundAssigned,
-      time: new Date().toLocaleTimeString()
-    };
-
-    setActiveToastSimulators(prev => [newSim, ...prev]);
     triggerToast(`Simulation: ${eventRow.category}`, `Audio Alert: "${eventRow.soundAssigned}" fired successfully!`, "info");
-
-    // Remove simulator alert automatically in 8 seconds
-    setTimeout(() => {
-      setActiveToastSimulators(prev => prev.filter(t => t.id !== id));
-    }, 8000);
   };
 
   // Custom File Uploader validations
@@ -786,34 +801,6 @@ export default function NotificationsSoundsManagement({
         accept=".mp3,.wav" 
         className="hidden" 
       />
-
-      {/* 3. SIMULATOR FLOATING LIVE ALERTS (Corner Overlay View) */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-[420px] w-full">
-        {activeToastSimulators.map(sim => (
-          <div 
-            key={sim.id}
-            className={`p-4 rounded-xl border shadow-2xl animate-bounce-short flex flex-col gap-1 transition-all relative overflow-hidden ${isDarkMode ? "bg-slate-900 border-[#E23744]/40 text-white" : "bg-white border-[#E23744]/20 text-slate-800"}`}
-          >
-            {/* Ambient animated red strip */}
-            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#E23744]" />
-            <div className="flex justify-between items-start pl-2">
-              <div className="flex items-center gap-1.5">
-                <Smartphone className="w-4 h-4 text-[#E23744] animate-pulse" />
-                <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Device Test Sandbox</span>
-              </div>
-              <span className="text-[9px] text-[#E23744] font-mono bg-[#E23744]/10 px-2 py-0.5 rounded-full">{sim.soundPlayed} played</span>
-            </div>
-            <div className="pl-2 mt-1">
-              <h2 className="text-xs font-black text-[#E23744]">{sim.title}</h2>
-              <p className="text-[11px] text-gray-400 mt-1 leading-relaxed font-semibold">{sim.message}</p>
-              <div className="mt-2.5 flex justify-between items-center text-[9px] text-gray-500 font-bold border-t pt-2 border-slate-100/10">
-                <span>Microservice Callback: SUCCESS</span>
-                <span>{sim.time}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {/* 4. MAIN THREE-COLUMN DISCORD & SLACK-INSPIRED WORKSPACE */}
       <div className="flex flex-col lg:flex-row min-h-[600px]">
@@ -1653,6 +1640,150 @@ export default function NotificationsSoundsManagement({
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* CAMPAIGN BROADCAST CHRONOLOGY & LIVE COMPOSER */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6 border-t border-slate-100/10 mt-6 select-none font-sans">
+                {/* Left side: Compose on the spot panel */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!composerTitle || !composerMessage) {
+                      triggerToast("Form Incomplete", "Please specify a notification title and message body.", "error");
+                      return;
+                    }
+
+                    const newCampaign = {
+                      id: `camp-${Date.now()}`,
+                      title: composerTitle,
+                      message: composerMessage,
+                      segment: composerTarget,
+                      recipients: composerTarget === "All Riders" ? 42 : composerTarget === "Partner Restaurants" ? 18 : 154,
+                      timestamp: new Date().toLocaleString()
+                    };
+
+                    setCampaigns(prev => [newCampaign, ...prev]);
+                    triggerToast("Broadcast Dispatched", `Notification campaign "${composerTitle}" transmitted globally.`, "success");
+                    setComposerTitle("");
+                    setComposerMessage("");
+                  }}
+                  className={`lg:col-span-5 p-5 rounded-2xl border flex flex-col space-y-4 ${isDarkMode ? "bg-slate-905 border-slate-800 text-slate-100" : "bg-white border-slate-205 text-slate-800 shadow-xs"}`}
+                >
+                  <div className="flex items-center gap-2 border-b pb-2 border-slate-100/10">
+                    <Smartphone className="w-5 h-5 text-[#E23744]" />
+                    <div className="text-left">
+                      <h4 className="text-xs font-black uppercase tracking-wider">Fast Campaign Broadcaster</h4>
+                      <p className="text-[10px] text-gray-400">Transmit micro-alerts instantly to consumer app devices.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Target Audience Cohort</label>
+                    <select
+                      value={composerTarget}
+                      onChange={(e) => setComposerTarget(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border focus:outline-none ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-gray-50 border-gray-200 text-gray-800"}`}
+                    >
+                      <option value="All Users">All Customers & Residents (154)</option>
+                      <option value="All Riders">Active Dispatch Riders (42)</option>
+                      <option value="Partner Restaurants">Partner Restaurants (18)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Notification Title</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Flash Sales Enabled!"
+                      value={composerTitle}
+                      onChange={(e) => setComposerTitle(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border focus:outline-none ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200 placeholder-gray-600" : "bg-gray-50 border-gray-200 text-gray-800"}`}
+                    />
+                  </div>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Message Body</label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="e.g. Extra 20% discount on entire menu catalogs in Udaipur city boundaries."
+                      value={composerMessage}
+                      onChange={(e) => setComposerMessage(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border focus:outline-none resize-none ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200 placeholder-gray-600" : "bg-gray-50 border-gray-200 text-gray-800"}`}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl text-xs font-extrabold tracking-wide uppercase hover:opacity-90 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Zap className="w-4 h-4 text-amber-300 fill-amber-300" /> Transmit Signal
+                  </button>
+                </form>
+
+                {/* Right side: Dispatched History logs */}
+                <div className={`lg:col-span-7 p-5 rounded-2xl border flex flex-col space-y-4 ${isDarkMode ? "bg-slate-905 border-slate-800 text-slate-100" : "bg-white border-slate-205 text-slate-800 shadow-xs"}`}>
+                  <div className="flex justify-between items-center border-b pb-2 border-slate-100/10">
+                    <div className="flex items-center gap-2">
+                      <History className="w-5 h-5 text-gray-400" />
+                      <div className="text-left">
+                        <h4 className="text-xs font-black uppercase tracking-wider">Dispatched Push History ({campaigns.length})</h4>
+                        <p className="text-[10px] text-gray-400">Global signal logs dispatched via CRM dashboards.</p>
+                      </div>
+                    </div>
+                    {campaigns.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setCampaigns([]);
+                          triggerToast("All Logs Cleared", "Cleared all dispatched broadcast campaigns.", "success");
+                        }}
+                        className="text-[10px] font-extrabold tracking-wider uppercase text-red-500 hover:underline cursor-pointer"
+                      >
+                        Purge All
+                      </button>
+                    )}
+                  </div>
+
+                  {campaigns.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+                      <Bell className="w-8 h-8 text-gray-500/30 animate-pulse" />
+                      <p className="text-xs text-gray-400">No active custom broadcast entries currently exist.</p>
+                      <p className="text-[10px] text-gray-500">Transmitted signals will append in dynamic sequence here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[310px] overflow-y-auto pr-1">
+                      {campaigns.map((camp) => (
+                        <div
+                          key={camp.id}
+                          className={`p-3 rounded-xl border flex justify-between items-start text-left text-xs transition-all ${isDarkMode ? "bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700" : "bg-gray-50/50 border-gray-150 text-slate-700 hover:border-gray-300"}`}
+                        >
+                          <div className="space-y-1 max-w-[85%]">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-black text-[#E23744] text-xs">{camp.title}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${isDarkMode ? "bg-slate-800 text-slate-300" : "bg-gray-200 text-slate-700"}`}>
+                                {camp.segment}
+                              </span>
+                              <span className="text-[9px] text-gray-400 font-mono">({camp.recipients} Rec.)</span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 leading-normal">{camp.message}</p>
+                            <div className="text-[9px] text-gray-500 font-mono italic">Dispatched: {camp.timestamp}</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setCampaigns(prev => prev.filter(c => c.id !== camp.id));
+                              triggerToast("Alert Log Purged", `Permanently deleted campaign: "${camp.title}"`, "info");
+                            }}
+                            className={`p-1.5 rounded-lg hover:bg-slate-500/10 text-gray-400 hover:text-red-500 transition-colors cursor-pointer`}
+                            title="Delete campaign"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

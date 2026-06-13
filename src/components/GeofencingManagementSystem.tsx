@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { 
   Plus, Upload, Download, BarChart2, Save, Search, Filter, 
-  Map, Table, Users, Building, HelpCircle, Flame, Clock, 
+  Map as MapIcon, Table, Users, Building, HelpCircle, Flame, Clock, 
   Settings, TrendingUp, DollarSign, ShoppingBag, ShieldAlert,
   Edit2, Trash2, Copy, ToggleLeft, ToggleRight, Check, X,
   ArrowRight, ShieldCheck, Activity, UserCheck, AlertTriangle
@@ -15,6 +15,7 @@ import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import { GeofencingZone, Restaurant, Rider } from "../types";
 import { AreaZoneConfig, DeliveryHub, LocalManager } from "./geofencing/GeofencingTypes";
 import { INITIAL_AREAS, MOCK_HUBS, MOCK_MANAGERS, MOCK_TRENDS } from "./geofencing/GeofencingMockData";
+import { useCityContext } from "../context/CityContext";
 import GeofencingMapWorkspace from "./geofencing/GeofencingMapWorkspace";
 import GeofencingZoneConfigPanel from "./geofencing/GeofencingZoneConfigPanel";
 
@@ -33,8 +34,126 @@ export default function GeofencingManagementSystem({
   riders,
   triggerToast
 }: GeofencingManagementSystemProps) {
+  const { cities } = useCityContext();
+
   // -------------------- MAIN STATE MANAGERS --------------------
-  const [areas, setAreas] = useState<AreaZoneConfig[]>(INITIAL_AREAS);
+  const [areas, setAreas] = useState<AreaZoneConfig[]>(() => {
+    const saved = localStorage.getItem("googly_geofencing_areas");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // use default
+      }
+    }
+    return INITIAL_AREAS;
+  });
+
+  const isSyncingZones = React.useRef(false);
+
+  // Save areas to localStorage and propagate mapped updates back to zones state dynamically
+  useEffect(() => {
+    localStorage.setItem("googly_geofencing_areas", JSON.stringify(areas));
+    const mapped = areas.map(a => ({
+      id: a.id,
+      name: a.name,
+      polygon: a.points,
+      active: a.status === "Active",
+      ordersCount: a.restaurantsCount * 8 + a.ridersCount * 3,
+      surgeEnabled: a.surgePricingEnabled,
+      surgeMultiplier: a.peakHourMultiplier
+    }));
+    
+    // Only update zones if they are different from existing zones to prevent loops
+    if (JSON.stringify(mapped) !== JSON.stringify(zones)) {
+      isSyncingZones.current = true;
+      setZones(mapped);
+    }
+  }, [areas, setZones, zones]); // Removing zones, setZones from deps as they might trigger re-runs
+
+  // Cleanup areas if city is deleted
+  useEffect(() => {
+    setAreas(prevAreas => {
+      const newAreas = prevAreas.filter(area => 
+        cities.some(c => c.toLowerCase() === area.city.toLowerCase())
+      );
+      if (newAreas.length !== prevAreas.length) {
+        return newAreas;
+      }
+      return prevAreas;
+    });
+  }, [cities]);
+
+  // Handle incoming real-time zone replica sync alerts safely
+  useEffect(() => {
+    if (isSyncingZones.current) {
+      isSyncingZones.current = false;
+      return;
+    }
+    const zonesIds = new Set(zones.map(z => z.id));
+    const areasIds = new Set(areas.map(a => a.id));
+    
+    const needsRemoval = areas.some(a => !zonesIds.has(a.id));
+    const needsAddition = zones.some(z => !areasIds.has(z.id));
+    
+    const needsStatusUpdate = zones.some(z => {
+      const match = areas.find(a => a.id === z.id);
+      if (!match) return false;
+      const expectedStatus = z.active ? "Active" : "Inactive";
+      return match.status !== expectedStatus || match.name !== z.name;
+    });
+
+    if (needsRemoval || needsAddition || needsStatusUpdate) {
+      setAreas(prevAreas => {
+        const areaMap = new Map(prevAreas.map(a => [a.id, a]));
+        return zones.map(z => {
+          const existing = areaMap.get(z.id);
+          if (existing) {
+            return {
+              ...(existing as any),
+              name: z.name,
+              points: z.polygon,
+              status: (z.active ? "Active" : "Inactive") as any,
+              surgePricingEnabled: z.surgeEnabled,
+              peakHourMultiplier: z.surgeMultiplier
+            };
+          } else {
+            const randId = Math.floor(1000 + Math.random() * 9000);
+            return {
+              id: z.id,
+              name: z.name,
+              code: `EZ-KOL-${randId}`,
+              description: "Synchronized active regional delivery sector.",
+              status: (z.active ? "Active" : "Inactive") as any,
+              color: "#f43f5e",
+              primaryPinCode: "700091",
+              city: "Kolkata",
+              state: "West Bengal",
+              additionalPinCodes: [],
+              boundaryType: "Polygon" as any,
+              points: z.polygon,
+              coverageSqKm: 12.0,
+              populationEstimate: 150000,
+              restaurantsCount: z.ordersCount ? Math.max(1, Math.round(z.ordersCount / 8)) : 10,
+              ridersCount: z.ordersCount ? Math.max(1, Math.round(z.ordersCount / 15)) : 5,
+              assignedHubId: "hub-central",
+              assignedManagerId: "mgr-01",
+              baseDeliveryFee: 40,
+              perKmCharge: 10,
+              maxDeliveryRadius: 15,
+              minOrderValue: 200,
+              avgDeliveryTime: 35,
+              freeDeliveryThreshold: 500,
+              surgePricingEnabled: z.surgeEnabled,
+              peakHourMultiplier: z.surgeMultiplier,
+              createdDate: new Date().toISOString().split("T")[0]
+            };
+          }
+        });
+      });
+    }
+  }, [zones, areas, setAreas]);
+
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>("area-1");
   const [viewMode, setViewMode] = useState<"split" | "table" | "analytics">("split");
   const [showAddPanel, setShowAddPanel] = useState(false);
@@ -92,6 +211,9 @@ export default function GeofencingManagementSystem({
   // -------------------- DATA SELECTOR FILTERS --------------------
   const filteredAreas = useMemo(() => {
     return areas.filter(area => {
+      const cityExists = cities.some(c => c.toLowerCase() === area.city.toLowerCase());
+      if (!cityExists) return false;
+
       const matchSearch = area.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           area.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           area.primaryPinCode.includes(searchQuery);
@@ -102,12 +224,10 @@ export default function GeofencingManagementSystem({
 
       return matchSearch && matchCity && matchStatus && matchManager && matchHub;
     });
-  }, [areas, searchQuery, filterCity, filterStatus, filterManager, filterHub]);
+  }, [areas, searchQuery, filterCity, filterStatus, filterManager, filterHub, cities]);
 
-  // Cities list for select options
-  const cityOptions = useMemo(() => {
-    return Array.from(new Set(areas.map(a => a.city)));
-  }, [areas]);
+  // Cities list from active cities directory
+  const cityOptions = cities;
 
   // Overall Coverage statistics calculation
   const statistics = useMemo(() => {
@@ -370,7 +490,7 @@ export default function GeofencingManagementSystem({
         <div className="bg-slate-900 p-4 rounded-2xl border border-slate-900 space-y-1 shadow-md">
           <div className="flex justify-between items-center text-gray-500 font-extrabold uppercase text-[9px]">
             <span>Total Zones</span>
-            <Map className="w-4 h-4 text-rose-500" />
+            <MapIcon className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-2xl font-black text-white">{statistics.total}</div>
           <div className="text-[10px] text-gray-400 font-semibold italic">Registered perimeters</div>
@@ -522,7 +642,7 @@ export default function GeofencingManagementSystem({
             onClick={() => setViewMode("split")}
             className={`px-3 py-1.5 rounded-lg flex items-center gap-1 ${viewMode === "split" ? "bg-rose-600 text-white" : "text-gray-400 hover:text-white"}`}
           >
-            <Map className="w-3.5 h-3.5" /> Map First Layout
+            <MapIcon className="w-3.5 h-3.5" /> Map First Layout
           </button>
           <button
             onClick={() => setViewMode("table")}

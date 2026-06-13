@@ -58,10 +58,10 @@ function AppContent() {
   
   const deviceOriginId = useRef(Math.random().toString(36).substring(7)).current;
 
-  // --- Persistent State Initializes (Raw States) ---
-  const [rawRestaurants, setRawRestaurants] = useState<Restaurant[]>(() => getStoredData("restaurants", []));
-  const [rawMenuItems, setRawMenuItems] = useState<MenuItem[]>(() => getStoredData("menuItems", []));
-  const [rawRiders, setRawRiders] = useState<Rider[]>(() => getStoredData("riders_v3", []));
+  // --- Persistent State Initializes (Raw States with high fidelity Mock Fallbacks) ---
+  const [rawRestaurants, setRawRestaurants] = useState<Restaurant[]>(() => getStoredData("restaurants", INITIAL_RESTAURANTS));
+  const [rawMenuItems, setRawMenuItems] = useState<MenuItem[]>(() => getStoredData("menuItems", INITIAL_MENU_ITEMS));
+  const [rawRiders, setRawRiders] = useState<Rider[]>(() => getStoredData("riders_v3", INITIAL_RIDERS));
   const { data: users, updateItem: updateUser, deleteItem: deleteUser, addItem: addUser } = useSupabaseCollection<User>("users");
   
   // Adapted addUser to match the expected interface in child components
@@ -71,17 +71,17 @@ function AppContent() {
       (window as any).publishRealtimeEvent("INSERT", "users", user, "new_user");
     }
   };
-  const [rawOrders, setRawOrders] = useState<Order[]>(() => getStoredData("orders_v3", []));
-  const [rawCoupons, setRawCoupons] = useState<Coupon[]>(() => getStoredData("coupons", []));
-  const [rawTickets, setRawTickets] = useState<SupportTicket[]>(() => getStoredData("tickets", []));
-  const [rawRefunds, setRawRefunds] = useState<RefundRequest[]>(() => getStoredData("refunds", []));
-  const [rawZones, setRawZones] = useState<GeofencingZone[]>(() => getStoredData("zones", []));
-  const [rawReviews, setRawReviews] = useState<ReviewRating[]>(() => getStoredData("reviews", []));
-  const [rawBanners, setRawBanners] = useState<CMSBanner[]>(() => getStoredData("banners", []));
+  const [rawOrders, setRawOrders] = useState<Order[]>(() => getStoredData("orders_v3", INITIAL_ORDERS));
+  const [rawCoupons, setRawCoupons] = useState<Coupon[]>(() => getStoredData("coupons", INITIAL_COUPONS));
+  const [rawTickets, setRawTickets] = useState<SupportTicket[]>(() => getStoredData("tickets", INITIAL_TICKETS));
+  const [rawRefunds, setRawRefunds] = useState<RefundRequest[]>(() => getStoredData("refunds", INITIAL_REFUNDS));
+  const [rawZones, setRawZones] = useState<GeofencingZone[]>(() => getStoredData("zones", INITIAL_ZONES));
+  const [rawReviews, setRawReviews] = useState<ReviewRating[]>(() => getStoredData("reviews", INITIAL_REVIEWS));
+  const [rawBanners, setRawBanners] = useState<CMSBanner[]>(() => getStoredData("banners", INITIAL_BANNERS));
   const [rawLoyalty, setRawLoyalty] = useState<LoyaltyConfig>(() => getStoredData("loyalty", INITIAL_LOYALTY));
   const [rawPenalties, setRawPenalties] = useState<PenaltyLogic[]>(() => getStoredData("penalties", INITIAL_PENALTIES));
   const [rawTaxSettings, setRawTaxSettings] = useState<TaxSettings>(() => getStoredData("taxSettings", INITIAL_TAX));
-  const [rawStaff, setRawStaff] = useState<StaffMember[]>(() => getStoredData("staff", []));
+  const [rawStaff, setRawStaff] = useState<StaffMember[]>(() => getStoredData("staff", INITIAL_STAFF));
   const [rawGlobalSettings, setRawGlobalSettings] = useState<GlobalSettings>(() => getStoredData("globalSettings", INITIAL_GLOBAL_SETTINGS));
   const [rawWeatherWidget, setRawWeatherWidget] = useState<TrafficWeatherWidget>(() => getStoredData("weatherWidget", INITIAL_TRAFFIC_WEATHER));
   const [rawProfile, setRawProfile] = useState<ProfileSecurity>(() => getStoredData("profile", INITIAL_PROFILE));
@@ -105,55 +105,56 @@ function AppContent() {
   const weatherWidget = rawWeatherWidget;
   const profile = rawProfile;
 
-  // Broadcaster State Setter builder
+  // Broadcaster State Setter builder - dynamically resolved using functional updater to avoid stale closure state
   const createBroadcastingSetState = <T extends { id: string }>(
     tableName: string,
-    rawSetter: React.Dispatch<React.SetStateAction<T[]>>,
-    currentData: T[]
+    rawSetter: React.Dispatch<React.SetStateAction<T[]>>
   ) => {
     return (action: React.SetStateAction<T[]>) => {
-      let nextData: T[];
-      if (typeof action === 'function') {
-        nextData = (action as any)(currentData);
-      } else {
-        nextData = action;
-      }
-
-      const prevIds = new Set(currentData.map(x => x.id));
-      const nextIds = new Set(nextData.map(x => x.id));
-
-      currentData.forEach(item => {
-        if (!nextIds.has(item.id)) {
-          (window as any).publishRealtimeEvent?.("DELETE", tableName, null, item.id);
-        }
-      });
-
-      nextData.forEach(item => {
-        if (!prevIds.has(item.id)) {
-          (window as any).publishRealtimeEvent?.("INSERT", tableName, item, item.id);
+      rawSetter(prevData => {
+        let nextData: T[];
+        if (typeof action === 'function') {
+          nextData = (action as any)(prevData);
         } else {
-          const oldItem = currentData.find(x => x.id === item.id);
-          if (JSON.stringify(oldItem) !== JSON.stringify(item)) {
-            (window as any).publishRealtimeEvent?.("UPDATE", tableName, item, item.id);
-          }
+          nextData = action;
         }
-      });
 
-      rawSetter(nextData);
+        const prevIds = new Set(prevData.map(x => x.id));
+        const nextIds = new Set(nextData.map(x => x.id));
+
+        prevData.forEach(item => {
+          if (!nextIds.has(item.id)) {
+            (window as any).publishRealtimeEvent?.("DELETE", tableName, null, item.id);
+          }
+        });
+
+        nextData.forEach(item => {
+          if (!prevIds.has(item.id)) {
+            (window as any).publishRealtimeEvent?.("INSERT", tableName, item, item.id);
+          } else {
+            const oldItem = prevData.find(x => x.id === item.id);
+            if (JSON.stringify(oldItem) !== JSON.stringify(item)) {
+              (window as any).publishRealtimeEvent?.("UPDATE", tableName, item, item.id);
+            }
+          }
+        });
+
+        return nextData;
+      });
     };
   };
 
-  const setRestaurants = createBroadcastingSetState("restaurants", setRawRestaurants, rawRestaurants);
-  const setMenuItems = createBroadcastingSetState("menuItems", setRawMenuItems, rawMenuItems);
-  const setRiders = createBroadcastingSetState("riders_v3", setRawRiders, rawRiders);
-  const setOrders = createBroadcastingSetState("orders_v3", setRawOrders, rawOrders);
-  const setCoupons = createBroadcastingSetState("coupons", setRawCoupons, rawCoupons);
-  const setTickets = createBroadcastingSetState("tickets", setRawTickets, rawTickets);
-  const setRefunds = createBroadcastingSetState("refunds", setRawRefunds, rawRefunds);
-  const setZones = createBroadcastingSetState("zones", setRawZones, rawZones);
-  const setReviews = createBroadcastingSetState("reviews", setRawReviews, rawReviews);
-  const setBanners = createBroadcastingSetState("banners", setRawBanners, rawBanners);
-  const setStaff = createBroadcastingSetState("staff", setRawStaff, rawStaff);
+  const setRestaurants = createBroadcastingSetState("restaurants", setRawRestaurants);
+  const setMenuItems = createBroadcastingSetState("menuItems", setRawMenuItems);
+  const setRiders = createBroadcastingSetState("riders_v3", setRawRiders);
+  const setOrders = createBroadcastingSetState("orders_v3", setRawOrders);
+  const setCoupons = createBroadcastingSetState("coupons", setRawCoupons);
+  const setTickets = createBroadcastingSetState("tickets", setRawTickets);
+  const setRefunds = createBroadcastingSetState("refunds", setRawRefunds);
+  const setZones = createBroadcastingSetState("zones", setRawZones);
+  const setReviews = createBroadcastingSetState("reviews", setRawReviews);
+  const setBanners = createBroadcastingSetState("banners", setRawBanners);
+  const setStaff = createBroadcastingSetState("staff", setRawStaff);
 
   const setGlobalSettings = (action: React.SetStateAction<GlobalSettings>) => {
     let next: GlobalSettings;

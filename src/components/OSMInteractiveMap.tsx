@@ -7,17 +7,61 @@ import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Compass, MapPin, Search, Store, Navigation, Shield, Compass as Radar, HelpCircle, ArrowRight, Loader2 } from "lucide-react";
+import { useCityContext } from "../context/CityContext";
 
 // --- Coordinates Helper ---
-// Translate percentage coordinates from mock data (x, y) to real latitudes & longitudes centering over Kolkata, West Bengal
+export const CITY_COORDINATES: Record<string, [number, number]> = {
+  "kolkata": [22.5726, 88.4139],
+  "mumbai": [19.0760, 72.8777],
+  "delhi": [28.7041, 77.1025],
+  "new delhi": [28.6139, 77.2090],
+  "bangalore": [12.9716, 77.5946],
+  "bengaluru": [12.9716, 77.5946],
+  "chennai": [13.0827, 80.2707],
+  "hyderabad": [17.3850, 78.4867],
+  "pune": [18.5204, 73.8567],
+  "gurgaon": [28.4595, 77.0266],
+  "gurugram": [28.4595, 77.0266],
+  "noida": [28.5355, 77.3910],
+  "jaipur": [26.9124, 75.7873],
+  "ahmedabad": [23.0225, 72.5714],
+  "surat": [21.1702, 72.8311],
+  "lucknow": [26.8467, 80.9462],
+  "patna": [25.5941, 85.1376],
+  "chandigarh": [30.7333, 76.7794],
+  "cochi": [9.9312, 76.2673],
+  "kochi": [9.9312, 76.2673],
+  "goa": [15.2993, 74.1240],
+  "howrah": [22.5769, 88.3186],
+  "new town": [22.5785, 88.4632],
+  "all cities": [22.5726, 88.4139] // default
+};
+
+export function getCityCoords(cityName: string): [number, number] {
+  const norm = cityName.toLowerCase().trim();
+  if (CITY_COORDINATES[norm]) {
+    return CITY_COORDINATES[norm];
+  }
+  // Safe stable hash mapping for any custom city name
+  let hash = 0;
+  for (let i = 0; i < norm.length; i++) {
+    hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const latMod = 12 + (Math.abs(hash) % 16);
+  const lonMod = 72 + (Math.abs(hash >> 2) % 16);
+  return [latMod, lonMod];
+}
+
+// Translate percentage coordinates from mock data (x, y) to real latitudes & longitudes centering dynamically on chosen city
 export function translatePercentToCoords(x?: number, y?: number): [number, number] {
   const safeX = typeof x === 'number' && !isNaN(x) ? x : 50;
   const safeY = typeof y === 'number' && !isNaN(y) ? y : 50;
-  // Center of Kolkata Salt Lake Sector V is around Lat: 22.5726, Lon: 88.4139
-  // Lon runs from 88.35 to 88.45
-  // Lat runs from 22.61 to 22.53 (inverted since SVG y-axis runs downward)
-  const lon = 88.35 + (safeX / 100) * 0.10;
-  const lat = 22.61 - (safeY / 100) * 0.08;
+  
+  const currentCity = localStorage.getItem("googly_global_city") || "Kolkata";
+  const [latCenter, lonCenter] = getCityCoords(currentCity);
+
+  const lon = (lonCenter - 0.05) + (safeX / 100) * 0.10;
+  const lat = (latCenter + 0.04) - (safeY / 100) * 0.08;
   return [lat, lon];
 }
 
@@ -139,6 +183,8 @@ export default function OSMInteractiveMap({
   height = "420px",
   isDarkMode = false,
 }: OSMInteractiveMapProps) {
+  const { globalCity } = useCityContext();
+
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
@@ -153,6 +199,14 @@ export default function OSMInteractiveMap({
   // Geofence raw drawing coordinates
   const [drawnFenceCoords, setDrawnFenceCoords] = useState<[number, number][]>([]);
 
+  // Pan map dynamically to the globally selected active city center coordinates
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !globalCity) return;
+    const center = getCityCoords(globalCity);
+    map.setView(center, 13);
+  }, [globalCity]);
+
   // Initial setup: Boot Leaflet map with standard tiles
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -163,8 +217,8 @@ export default function OSMInteractiveMap({
       mapRef.current = null;
     }
 
-    // Default center is Sector V, Salt Lake, Kolkata
-    const initialCenter: [number, number] = [22.5726, 88.4139];
+    // Default center based on active city selection
+    const initialCenter: [number, number] = getCityCoords(globalCity || "Kolkata");
     const initialZoom = 13;
 
     const map = L.map(mapContainerRef.current, {
