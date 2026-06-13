@@ -74,10 +74,8 @@ export default function SafeResponsiveContainer({
     >
       {isReady && dimensions.width > 0 && dimensions.height > 0 ? (
         <ResponsiveContainer
-          width="100%"
-          height="100%"
-          minWidth={minWidth}
-          minHeight={minHeight}
+          width={dimensions.width}
+          height={dimensions.height}
         >
           {children}
         </ResponsiveContainer>

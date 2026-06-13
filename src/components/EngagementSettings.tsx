@@ -18,8 +18,9 @@ import {
 import { 
   Percent, Bell, Star, Image, Coins, AlertOctagon, Settings, 
   ShieldAlert, ShieldCheck, X, Plus, Calendar, Tag, AlertTriangle, 
-  TrendingUp, Check, Save, Lock, EyeOff, Radio, Power, Upload, Trash2 
+  TrendingUp, Check, Save, Lock, EyeOff, Radio, Power, Upload, Trash2, MapPin
 } from "lucide-react";
+import { useCityContext } from "../context/CityContext";
 
 interface EngagementSettingsProps {
   currentTab: string;
@@ -64,6 +65,22 @@ export default function EngagementSettings({
 }: EngagementSettingsProps) {
 
   // --- Coupon State ---
+  const { cities, addCity, deleteCity, globalCity } = useCityContext();
+  const [newCityInput, setNewCityInput] = useState("");
+
+  const handleAddCity = () => {
+    const trimmed = newCityInput.trim();
+    if (!trimmed) return;
+    addCity(trimmed);
+    triggerToast("City Node Added", `Successfully registered "${trimmed}" in global region directories.`, "success");
+    setNewCityInput("");
+  };
+
+  const handleDeleteCity = (cityName: string) => {
+    deleteCity(cityName);
+    triggerToast("City Node Deleted", `Successfully purged "${cityName}" from regional indexes.`, "success");
+  };
+
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [newCoupon, setNewCoupon] = useState({
     code: "", title: "", type: "percentage" as Coupon["type"], value: 15,
@@ -353,6 +370,71 @@ export default function EngagementSettings({
               >
                 Persist Global Settings
               </button>
+            </div>
+          </div>
+
+          {/* --- CITY DIRECTORY MANAGEMENT --- */}
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 border-b border-gray-50 pb-2">
+              <MapPin className="w-5 h-5 text-[#E23744]" />
+              <div>
+                <h3 className="text-sm font-black text-gray-950">Active City & Region Directories</h3>
+                <p className="text-[10px] text-gray-400 font-semibold mb-1">Register new corporate delivery hubs or purge retired operational regions.</p>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  id="new-city-name-input"
+                  type="text"
+                  placeholder="Enter new city name (e.g. Mumbai)"
+                  value={newCityInput}
+                  onChange={(e) => setNewCityInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCity();
+                    }
+                  }}
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-[#E23744]"
+                />
+                <button
+                  id="add-city-button"
+                  onClick={handleAddCity}
+                  className="px-4 py-2 bg-[#E23744] hover:bg-[#c92f3b] text-white font-extrabold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add City
+                </button>
+              </div>
+
+              <div className="border border-gray-100 rounded-xl overflow-hidden bg-gray-50/50">
+                <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 font-bold">
+                  {cities.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-gray-400 font-bold">No active cities registered in directory.</div>
+                  ) : (
+                    cities.map(city => (
+                      <div key={city} id={`city-item-${city.toLowerCase().replace(/\s+/g, '-')}`} className="flex justify-between items-center p-3 bg-white hover:bg-gray-50/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                          <span className="text-xs font-extrabold text-gray-800">{city}</span>
+                          {globalCity === city && (
+                            <span className="bg-red-50 text-[#E23744] text-[9px] font-black px-1.5 py-0.5 rounded-full border border-red-100">Active Selection</span>
+                          )}
+                        </div>
+                        <button
+                          id={`delete-city-${city.toLowerCase().replace(/\s+/g, '-')}`}
+                          onClick={() => handleDeleteCity(city)}
+                          className="p-1.5 text-gray-450 hover:text-red-650 hover:bg-red-50/50 rounded-lg cursor-pointer transition-all border border-transparent hover:border-red-100/50"
+                          title={`Permanently delete city ${city}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

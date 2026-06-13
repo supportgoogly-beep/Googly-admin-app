@@ -142,6 +142,44 @@ async function startServer() {
 
   app.use(express.json());
 
+  // --- REAL-TIME REPLICATION & MULTI-DEVICE BROADCAST HUB (SSE) ---
+  const sseClients = new Set<any>();
+
+  app.get("/api/realtime/sync-stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    res.write("data: {\"init\":true}\n\n");
+
+    sseClients.add(res);
+    console.log(`[REALTIME-SSE] New device linked. Total subscribers: ${sseClients.size}`);
+
+    req.on("close", () => {
+      sseClients.delete(res);
+      console.log(`[REALTIME-SSE] Device untracked. Total subscribers: ${sseClients.size}`);
+    });
+  });
+
+  app.post("/api/realtime/publish", (req, res) => {
+    const { event, table, row, rowId, origin } = req.body;
+    const payload = JSON.stringify({ event, table, row, rowId, origin });
+    
+    let counter = 0;
+    sseClients.forEach((client) => {
+      try {
+        client.write(`data: ${payload}\n\n`);
+        counter++;
+      } catch (err) {
+        sseClients.delete(client);
+      }
+    });
+
+    console.log(`[REALTIME-SSE] Transmitted ${event} on table ${table} (rowId: ${rowId}) to ${counter} devices.`);
+    res.json({ success: true, broadcastCount: counter });
+  });
+
   // Whitelist/Check-Authorized endpoints
   app.post("/api/auth/check-authorized", async (req, res) => {
     const { email } = req.body;
@@ -278,6 +316,36 @@ async function startServer() {
     }
   });
 
+  // API route to delete a user from Firebase Authentication
+  app.post("/api/auth/delete-user", async (req, res) => {
+    const { uid, email } = req.body;
+    if (!uid && !email) {
+      return res.status(400).json({ error: "UID or Email coordinate is required" });
+    }
+    try {
+      let targetUid = uid;
+      if (!targetUid && email) {
+        try {
+          const userRecord = await (admin as any).auth().getUserByEmail(email);
+          targetUid = userRecord.uid;
+        } catch (e: any) {
+          if (e.code === "auth/user-not-found") {
+            return res.json({ success: true, message: "User not found in Firebase Auth, bypassing." });
+          }
+          throw e;
+        }
+      }
+      if (targetUid) {
+        await (admin as any).auth().deleteUser(targetUid);
+        console.log(`[AUTH] User ${targetUid} (${email || ''}) successfully deleted from Firebase Authentication.`);
+      }
+      res.json({ success: true, message: "User successfully deleted from Firebase Auth." });
+    } catch (err: any) {
+      console.error("Failed to delete user from Firebase Auth:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API route to proxy Nominatim requests
   app.get("/api/proxy-nominatim", async (req, res) => {
     const { q } = req.query;
@@ -378,7 +446,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, 'dist', 'client');
+    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }

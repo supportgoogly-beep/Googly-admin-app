@@ -480,6 +480,18 @@ export default function UserManagementModule({
     if (!deleteModalUser) return;
     try {
       await deleteUser(deleteModalUser.id);
+      
+      // Also delete from Firebase Auth via our secure server proxy endpoint!
+      try {
+        await fetch("/api/auth/delete-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: deleteModalUser.email, uid: deleteModalUser.id })
+        });
+      } catch (authErr) {
+        console.error("Firebase auth deletion proxy error:", authErr);
+      }
+
       addLog(deleteModalUser.id, deleteModalUser.name, "User Deleted", "Permanently removed customer record from database.");
       triggerToast("Entry Expunged", `Corporate records for ${deleteModalUser.name} were permanently erased.`, "success");
       setDeleteModalUser(null);

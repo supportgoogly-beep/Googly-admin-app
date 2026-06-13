@@ -7,7 +7,53 @@ import {
 } from "lucide-react";
 import { Order, Restaurant, MenuItem, User as UserType } from "../types";
 import { initAuth, googleSignIn, logout, getAccessToken, WORKSPACE_SCOPES } from "../lib/workspaceAuth";
-import { User } from "firebase/auth";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from "firebase/auth";
+
+const getMockDriveFiles = () => {
+  const stored = localStorage.getItem("googly_mock_drive_files");
+  if (stored) return JSON.parse(stored);
+  
+  const defaults = [
+    {
+      id: "mock-spreadsheet-default-1",
+      name: "Googly ORDERS Export - Recent",
+      mimeType: "application/vnd.google-apps.spreadsheet",
+      webViewLink: "https://docs.google.com/spreadsheets",
+      createdTime: new Date(Date.now() - 3600000 * 2).toISOString(),
+      size: "18 KB"
+    },
+    {
+      id: "mock-doc-default-2",
+      name: "Daily Googly Corporate Briefing & Audit Report",
+      mimeType: "application/vnd.google-apps.document",
+      webViewLink: "https://docs.google.com/document",
+      createdTime: new Date(Date.now() - 3600000 * 24).toISOString(),
+      size: "24 KB"
+    },
+    {
+      id: "mock-file-default-3",
+      name: "Googly_Applet_Backup_2026-06-12.json",
+      mimeType: "application/json",
+      webViewLink: "#",
+      createdTime: new Date(Date.now() - 3600000 * 48).toISOString(),
+      size: "52 KB"
+    }
+  ];
+  localStorage.setItem("googly_mock_drive_files", JSON.stringify(defaults));
+  return defaults;
+};
+
+const saveMockDriveFile = (file: any) => {
+  const current = getMockDriveFiles();
+  const updated = [file, ...current];
+  localStorage.setItem("googly_mock_drive_files", JSON.stringify(updated));
+};
+
+const deleteMockDriveFile = (id: string) => {
+  const current = getMockDriveFiles();
+  const updated = current.filter((f: any) => f.id !== id);
+  localStorage.setItem("googly_mock_drive_files", JSON.stringify(updated));
+};
 
 interface WorkspaceDashboardProps {
   orders: Order[];
@@ -117,6 +163,21 @@ export default function WorkspaceDashboard({
     }
   };
 
+  const handleSandboxLogin = () => {
+    setGoogleUser({
+      displayName: "Googly Sandbox Admin",
+      email: "ruhandharpurkayastha@gmail.com",
+      photoURL: "https://api.dicebear.com/7.x/initials/svg?seed=Admin&backgroundColor=f97316"
+    } as any);
+    setToken("mock_sandbox_token");
+    setNeedsAuth(false);
+    triggerToast(
+      "Sandbox Workspace Activated",
+      "Running in offline simulation mode. No setup or popup configuration required.",
+      "success"
+    );
+  };
+
   // Handle Logout Action
   const handleGoogleLogout = async () => {
     try {
@@ -138,6 +199,36 @@ export default function WorkspaceDashboard({
     if (!token) return;
     setIsExportingSheets(true);
     setGeneratedSheetUrl(null);
+
+    if (token === "mock_sandbox_token") {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network latency
+        const title = `Googly ${exportSource.toUpperCase()} Export - ${new Date().toLocaleDateString()}`;
+        const mockSpreadsheetId = `mock-spreadsheet-${Math.floor(100000 + Math.random() * 900000)}`;
+        const resultUrl = `https://docs.google.com/spreadsheets/d/${mockSpreadsheetId}`;
+        setGeneratedSheetUrl(resultUrl);
+        
+        saveMockDriveFile({
+          id: mockSpreadsheetId,
+          name: title,
+          mimeType: "application/vnd.google-apps.spreadsheet",
+          webViewLink: resultUrl,
+          createdTime: new Date().toISOString(),
+          size: `${Math.floor(5 + Math.random() * 15)} KB`
+        });
+
+        triggerToast(
+          "Sheets Export Completed (Simulated)",
+          `Dataset with ${exportSource === "orders" ? orders.length : exportSource === "restaurants" ? restaurants.length : menuItems.length} entries written to Google Sheets.`,
+          "success"
+        );
+      } catch (err: any) {
+        console.error(err);
+      } finally {
+        setIsExportingSheets(false);
+      }
+      return;
+    }
 
     try {
       let spreadsheetId = sheetIdInput;
@@ -253,6 +344,31 @@ export default function WorkspaceDashboard({
     setIsGeneratingDocs(true);
     setGeneratedDocUrl(null);
 
+    if (token === "mock_sandbox_token") {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 900)); // Simulate generation latency
+        const mockDocId = `mock-doc-${Math.floor(100000 + Math.random() * 900000)}`;
+        const resultUrl = `https://docs.google.com/document/d/${mockDocId}`;
+        setGeneratedDocUrl(resultUrl);
+        
+        saveMockDriveFile({
+          id: mockDocId,
+          name: docModelTitle,
+          mimeType: "application/vnd.google-apps.document",
+          webViewLink: resultUrl,
+          createdTime: new Date().toISOString(),
+          size: `${Math.floor(12 + Math.random() * 25)} KB`
+        });
+
+        triggerToast("Google Doc Created (Simulated)", "An operations digest document has been formatted and published successfully.", "success");
+      } catch (err: any) {
+        console.error(err);
+      } finally {
+        setIsGeneratingDocs(false);
+      }
+      return;
+    }
+
     try {
       // 1. Create a brand-new blank document
       const createRes = await fetch("https://docs.googleapis.com/v1/documents", {
@@ -350,6 +466,24 @@ export default function WorkspaceDashboard({
   const fetchDriveFiles = async () => {
     if (!token) return;
     setIsFetchingDrive(true);
+
+    if (token === "mock_sandbox_token") {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const allFiles = getMockDriveFiles();
+        const filtered = allFiles.filter((f: any) => {
+          if (driveSearch.trim() === "") return true;
+          return f.name.toLowerCase().includes(driveSearch.toLowerCase());
+        });
+        setDriveFiles(filtered);
+      } catch (err: any) {
+        console.error(err);
+      } finally {
+        setIsFetchingDrive(false);
+      }
+      return;
+    }
+
     try {
       // Setup query filters for search input
       let q = "trashed = false";
@@ -378,6 +512,30 @@ export default function WorkspaceDashboard({
   const handleCreateDirectory = async () => {
     if (!token || !newFolderTargetName.trim()) return;
     setIsCreatingFolder(true);
+
+    if (token === "mock_sandbox_token") {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const mockFolderId = `mock-folder-${Math.floor(100000 + Math.random() * 900000)}`;
+        saveMockDriveFile({
+          id: mockFolderId,
+          name: newFolderTargetName.trim(),
+          mimeType: "application/vnd.google-apps.folder",
+          webViewLink: "#",
+          createdTime: new Date().toISOString(),
+          size: "—"
+        });
+        triggerToast("Directory Constructed (Simulated)", `Archive Directory folder "${newFolderTargetName}" initialized.`, "success");
+        setNewFolderTargetName("Googly Records Archive");
+        fetchDriveFiles();
+      } catch (err: any) {
+        console.error(err);
+      } finally {
+        setIsCreatingFolder(false);
+      }
+      return;
+    }
+
     try {
       const res = await fetch("https://www.googleapis.com/drive/v3/files", {
         method: "POST",
@@ -407,6 +565,30 @@ export default function WorkspaceDashboard({
   const handleUploadDatabaseBackup = async () => {
     if (!token) return;
     setIsUploadingBackup(true);
+
+    if (token === "mock_sandbox_token") {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 700));
+        const mockFileId = `mock-file-${Math.floor(100000 + Math.random() * 900000)}`;
+        const name = `Googly_Applet_Backup_${new Date().toISOString().split('T')[0]}_${Math.floor(100 + Math.random()*900)}.json`;
+        saveMockDriveFile({
+          id: mockFileId,
+          name,
+          mimeType: "application/json",
+          webViewLink: "#",
+          createdTime: new Date().toISOString(),
+          size: `${Math.floor(40 + Math.random() * 60)} KB`
+        });
+        triggerToast("System Backup Succeeded (Simulated)", "High-fidelity JSON backup successfully synchronized on your Cloud drive root.", "success");
+        fetchDriveFiles();
+      } catch (err: any) {
+        console.error(err);
+      } finally {
+        setIsUploadingBackup(false);
+      }
+      return;
+    }
+
     try {
       // Serialize current operations memory to an archive block
       const archiveMemoryDump = {
@@ -477,6 +659,13 @@ export default function WorkspaceDashboard({
       return;
     }
 
+    if (token === "mock_sandbox_token") {
+      deleteMockDriveFile(fileId);
+      triggerToast("File Purged Successfully (Simulated)", `Drive item "${fileName}" was successfully deleted.`, "success");
+      fetchDriveFiles();
+      return;
+    }
+
     try {
       const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
         method: "DELETE",
@@ -503,18 +692,22 @@ export default function WorkspaceDashboard({
 
   // Google Sign-In required panel
   if (needsAuth) {
+    const currentOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const currentHostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+
     return (
-      <div id="workspace-login-gateway" className="bg-white rounded-3xl border border-gray-100 p-8 md:p-12 text-center shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] max-w-2xl mx-auto my-8">
-        <div className="w-16 h-16 bg-gradient-to-tr from-orange-50 to-[#E23744]/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-[#E23744]/10">
+      <div id="workspace-login-gateway" className="bg-white rounded-3xl border border-gray-100 p-6 md:p-10 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] max-w-2xl mx-auto my-8">
+        <div className="w-16 h-16 bg-gradient-to-tr from-rose-50 to-[#E23744]/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-[#E23744]/10">
           <Database className="w-8 h-8 text-[#E23744]" />
         </div>
-        <h2 className="text-lg font-black text-gray-900 tracking-tight mb-2">Google Workspace Administrative Center</h2>
-        <p className="text-xs text-gray-500 font-semibold mb-6 max-w-md mx-auto leading-relaxed">
-          Unlock Google Drive, Sheets, and Docs operations with Googly. Authorize secure cloud integrations below to export transaction sheets, generate docs briefings, or manage cloud backups.
+        
+        <h2 className="text-lg font-black text-gray-900 tracking-tight text-center mb-2">Google Workspace Administrative Center</h2>
+        <p className="text-xs text-gray-500 font-semibold mb-6 max-w-md mx-auto leading-relaxed text-center">
+          Authorize secure cloud integrations below to export transaction sheets, generate operational summaries in Google Docs, or manage cloud backups.
         </p>
 
         {/* Workspace scope directory table */}
-        <div className="bg-gray-50/70 border border-gray-150 rounded-xl p-4 mb-8 text-left text-[11px] max-w-md mx-auto">
+        <div className="bg-gray-50/70 border border-gray-150 rounded-xl p-4 mb-6 text-left text-[11px] max-w-md mx-auto">
           <div className="font-extrabold text-gray-700 uppercase tracking-wider mb-2 text-[10px]">Permission Access Scope Requested:</div>
           <div className="space-y-1.5 font-semibold text-gray-650">
             <div className="flex items-start gap-1.5">
@@ -532,25 +725,56 @@ export default function WorkspaceDashboard({
           </div>
         </div>
 
-        {/* High-fidelity custom material design Google Sign In Button */}
-        <button 
-          onClick={handleGoogleLogin} 
-          disabled={isLoggingIn}
-          className="bg-black hover:bg-stone-900 text-white font-extrabold py-3 px-6 rounded-xl text-xs transition-all shadow-md active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 mx-auto disabled:opacity-50"
-        >
-          {isLoggingIn ? (
-            <RefreshCw className="w-4 h-4 animate-spin text-white" />
-          ) : (
-            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-4.5 h-4.5">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-              <path fill="none" d="M0 0h48v48H0z"></path>
-            </svg>
-          )}
-          <span>{isLoggingIn ? "Logging in..." : "Link Google Account"}</span>
-        </button>
+        {/* High-fidelity custom material design Google Sign In Buttons */}
+        <div className="space-y-3 max-w-md mx-auto mb-8">
+          <button 
+            onClick={handleGoogleLogin} 
+            disabled={isLoggingIn}
+            className="w-full bg-[#E23744] hover:bg-[#c92f3b] text-white font-extrabold py-3 px-6 rounded-xl text-xs transition-all shadow-md active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-50"
+          >
+            {isLoggingIn ? (
+              <RefreshCw className="w-4 h-4 animate-spin text-white" />
+            ) : (
+              <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-4.5 h-4.5">
+                <path fill="#ffffff" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                <path fill="#ffffff" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                <path fill="#ffffff" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                <path fill="#ffffff" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                <path fill="none" d="M0 0h48v48H0z"></path>
+              </svg>
+            )}
+            <span>{isLoggingIn ? "Configuring scopes..." : "Link Live Google Account"}</span>
+          </button>
+
+          <button 
+            type="button"
+            onClick={handleSandboxLogin}
+            className="w-full bg-slate-900 hover:bg-slate-850 text-white font-extrabold py-3 px-6 rounded-xl text-xs transition-all shadow-md active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5"
+          >
+            <Layers className="w-4 h-4 text-orange-400" />
+            <span>Launch Simulated Sandbox Fallback</span>
+          </button>
+        </div>
+
+        {/* Diagnostic deployment panel for user */}
+        <div className="border border-amber-100 bg-amber-50/20 rounded-2xl p-4 text-left max-w-md mx-auto">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="text-[11px] font-black text-amber-850 block">Firebase Deployment Diagnostics</span>
+              <p className="text-[10px] text-amber-700/90 leading-normal font-semibold">
+                If the authenticator says <code className="bg-amber-100/50 px-1 py-0.2 rounded font-mono text-rose-700 font-bold">"not registered"</code>, you must trust this origin in your Firebase settings.
+              </p>
+              <div className="mt-2.5 p-2 bg-white/80 border border-amber-200/50 rounded-lg font-mono text-[9px] text-gray-600 space-y-1">
+                <div><span className="font-bold text-gray-400">AUTHORIZED HOST:</span> <span className="font-extrabold text-blue-700 select-all">{currentHostname}</span></div>
+                <div><span className="font-bold text-gray-400">REDIRECT URI:</span> <span className="font-extrabold text-blue-700 select-all">{currentOrigin}/__/auth/handler</span></div>
+              </div>
+              <p className="text-[9px] text-gray-500 italic mt-1 leading-normal font-medium">
+                Add this authorized domain under <strong className="text-gray-600 font-bold">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains</strong> to connect your Netlify site.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

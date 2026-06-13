@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { getApiUrl } from "../lib/api";
 import {
   Shield, ShieldAlert, ShieldCheck, Key, Lock, Users, UserPlus, Search, Filter,
   Edit, Edit3, Trash2, Check, X, Info, AlertTriangle, AlertCircle, Copy, HelpCircle,
@@ -354,9 +355,54 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
   const [localDark, setLocalDark] = useState(false);
 
   // Core State Managers
-  const [staffList, setStaffList] = useState<RbacStaff[]>(INITIAL_STAFF_ACCOUNTS);
-  const [roles, setRoles] = useState<RbacRole[]>(INITIAL_ROLES);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
+  const [staffList, setStaffList] = useState<RbacStaff[]>(() => {
+    const saved = localStorage.getItem("googly_rbac_staffList");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fallback
+      }
+    }
+    return []; // Empty by default so demo items do not appear
+  });
+
+  const [roles, setRoles] = useState<RbacRole[]>(() => {
+    const saved = localStorage.getItem("googly_rbac_roles");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fallback
+      }
+    }
+    return INITIAL_ROLES;
+  });
+
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    const saved = localStorage.getItem("googly_rbac_auditLogs");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fallback
+      }
+    }
+    return []; // Empty by default
+  });
+
+  useEffect(() => {
+    localStorage.setItem("googly_rbac_staffList", JSON.stringify(staffList));
+  }, [staffList]);
+
+  useEffect(() => {
+    localStorage.setItem("googly_rbac_roles", JSON.stringify(roles));
+  }, [roles]);
+
+  useEffect(() => {
+    localStorage.setItem("googly_rbac_auditLogs", JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
   const [activeTab, setActiveTab] = useState<"directory" | "roles" | "audit" | "authorized">("directory");
 
   // Whitelisted Admin Access Control list state
@@ -368,7 +414,7 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
   const fetchWhitelist = async () => {
     try {
       setWhitelistLoading(true);
-      const res = await fetch("/api/auth/whitelist");
+      const res = await fetch(getApiUrl("/api/auth/whitelist"));
       if (res.ok) {
         const data = await res.json();
         setAuthorizedEmails(data);
@@ -393,7 +439,7 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
       return;
     }
     try {
-      const res = await fetch("/api/auth/whitelist", {
+      const res = await fetch(getApiUrl("/api/auth/whitelist"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -413,7 +459,7 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
 
   const handleRemoveAuthEmail = async (email: string) => {
     try {
-      const res = await fetch(`/api/auth/whitelist?email=${encodeURIComponent(email)}`, {
+      const res = await fetch(getApiUrl(`/api/auth/whitelist?email=${encodeURIComponent(email)}`), {
         method: "DELETE"
       });
       const data = await res.json();

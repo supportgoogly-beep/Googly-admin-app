@@ -14,18 +14,21 @@ function isValidUrl(url: string | undefined): boolean {
 
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    // Default fallback values from .env.example
+    const defaultUrl = "https://lzmzxxcwwqzgzxyiwpxj.supabase.co";
+    const defaultAnonKey = "sb_publishable_yZlwNv6cE1PAyoz3JThbZg_ZP5oaDDF";
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || defaultUrl;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || defaultAnonKey;
 
     if (!isValidUrl(supabaseUrl) || !supabaseAnonKey) {
-      console.warn("Supabase credentials missing or invalid. Using a dummy client for development.");
-      // We return a proxy or a dummy client that warns on use, or just create it with placeholders to avoid crash
+      console.warn("Supabase credentials invalid. Using a placeholder client.");
       _supabase = createClient(
-        isValidUrl(supabaseUrl) ? supabaseUrl! : "https://placeholder.supabase.co",
+        isValidUrl(supabaseUrl) ? supabaseUrl : "https://placeholder.supabase.co",
         supabaseAnonKey || "placeholder"
       );
     } else {
-      _supabase = createClient(supabaseUrl!, supabaseAnonKey);
+      _supabase = createClient(supabaseUrl, supabaseAnonKey);
     }
   }
   return _supabase;

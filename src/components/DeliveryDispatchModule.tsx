@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Order, Rider, OrderStatus, RiderStatus } from "../types";
+import { useCityContext } from "../context/CityContext";
 import { 
   MapPin, Search, Sliders, RefreshCw, ZoomIn, ZoomOut, Maximize2, 
   Sparkles, Check, Phone, X, AlertTriangle, Play, Settings, 
@@ -98,8 +99,9 @@ export default function DeliveryDispatchModule({
   // Selected Order for viewing visual details
   const [detailedOrder, setDetailedOrder] = useState<Order | null>(null);
 
+  const { cities } = useCityContext();
   // Static list of Cities & Zones for custom filters
-  const citiesList = ["All", "Kolkata", "Salt Lake", "New Town", "Gariahat"];
+  const citiesList = ["All", ...cities];
   const zonesList = ["All", "North Zone", "South Sector", "Central Hub", "East End"];
 
   // Real-world dummy assignment logs for the enterprise dashboard grid

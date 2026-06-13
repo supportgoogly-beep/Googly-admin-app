@@ -56,6 +56,25 @@ export function useSupabaseCollection<T extends { id: string }>(collectionName: 
       console.error(`Error adding to ${collectionName}:`, error);
       throw error;
     }
+
+    try {
+      if (insertedData && insertedData[0]) {
+        fetch("/api/realtime/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            event: "INSERT", 
+            table: collectionName, 
+            row: insertedData[0], 
+            rowId: (insertedData[0] as any).id,
+            origin: "supabase-hook"
+          })
+        });
+      }
+    } catch (e) {
+      console.warn("Supabase hook SSE broadcast error:", e);
+    }
+
     return insertedData;
   };
 
@@ -69,6 +88,22 @@ export function useSupabaseCollection<T extends { id: string }>(collectionName: 
       console.error(`Error updating in ${collectionName}:`, error);
       throw error;
     }
+
+    try {
+      fetch("/api/realtime/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          event: "UPDATE", 
+          table: collectionName, 
+          row: updates, 
+          rowId: id,
+          origin: "supabase-hook"
+        })
+      });
+    } catch (e) {
+      console.warn("Supabase hook SSE broadcast error:", e);
+    }
   };
 
   const deleteItem = async (id: string) => {
@@ -80,6 +115,22 @@ export function useSupabaseCollection<T extends { id: string }>(collectionName: 
     if (error) {
       console.error(`Error deleting from ${collectionName}:`, error);
       throw error;
+    }
+
+    try {
+      fetch("/api/realtime/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          event: "DELETE", 
+          table: collectionName, 
+          row: null, 
+          rowId: id,
+          origin: "supabase-hook"
+        })
+      });
+    } catch (e) {
+      console.warn("Supabase hook SSE broadcast error:", e);
     }
   };
 
