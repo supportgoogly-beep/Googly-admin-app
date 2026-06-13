@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Googly Super Admin Hub",
+  "description": "A comprehensive management portal for handling orders, restaurants, riders, and customer data with real-time tracking and operational analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
