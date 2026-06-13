@@ -28,7 +28,10 @@ export interface Category {
 interface MenuManagementModuleProps {
   restaurants: Restaurant[];
   menuItems: MenuItem[];
-  setMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>>;
+  addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<any>;
+  updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
+  deleteMenuItem: (id: string) => Promise<void>;
+  setMenuItems: (action: any) => void;
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
 }
 
@@ -43,6 +46,9 @@ const DEFAULT_CATEGORIES: Category[] = [
 export default function MenuManagementModule({
   restaurants,
   menuItems,
+  addMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
   setMenuItems,
   triggerToast
 }: MenuManagementModuleProps) {

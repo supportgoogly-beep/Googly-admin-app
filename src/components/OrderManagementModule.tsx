@@ -26,7 +26,9 @@ export interface ExtendedOrder extends Order {
 
 interface OrderManagementModuleProps {
   orders: Order[];
-  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+  setOrders: (action: any) => void;
+  updateOrder: (id: string, updates: Partial<Order>) => Promise<void>;
+  deleteOrder: (id: string) => Promise<void>;
   restaurants: Restaurant[];
   riders: Rider[];
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
@@ -35,6 +37,8 @@ interface OrderManagementModuleProps {
 export default function OrderManagementModule({
   orders,
   setOrders,
+  updateOrder,
+  deleteOrder,
   restaurants,
   riders,
   triggerToast
@@ -237,89 +241,93 @@ export default function OrderManagementModule({
   const totalPages = Math.ceil(sortedOrders.length / itemsPerPage) || 1;
 
   // Change order status function
-  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        return { ...o, status: newStatus };
-      }
-      return o;
-    }));
-    triggerToast(
-      "Workflow progression", 
-      `Order ${orderId} successfully shifted to ${newStatus}.`, 
-      newStatus === "Cancelled" ? "error" : "success"
-    );
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      await updateOrder(orderId, { status: newStatus });
+      triggerToast(
+        "Workflow progression", 
+        `Order ${orderId} successfully shifted to ${newStatus}.`, 
+        newStatus === "Cancelled" ? "error" : "success"
+      );
+    } catch (err) {
+      console.error("Status update error:", err);
+      triggerToast("Sync Error", "Failed to update order status.", "error");
+    }
   };
 
   // Assign or Reassign Rider
-  const assignRiderToOrder = (orderId: string, riderId: string) => {
+  const assignRiderToOrder = async (orderId: string, riderId: string) => {
     const foundRider = riders.find(r => r.id === riderId);
     if (!foundRider) return;
 
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        return { 
-          ...o, 
-          riderId: foundRider.id, 
-          riderName: foundRider.name,
-          // Progress to "Preparing" or keep if preparing
-          status: o.status === "Pending" ? "Preparing" : o.status
-        };
-      }
-      return o;
-    }));
+    try {
+      const matchedOrder = orders.find(o => o.id === orderId);
+      await updateOrder(orderId, { 
+        riderId: foundRider.id, 
+        riderName: foundRider.name,
+        // Progress to "Preparing" or keep if preparing
+        status: matchedOrder?.status === "Pending" ? "Preparing" : matchedOrder?.status
+      });
 
-    triggerToast(
-      "Rider Dispatch Assigned", 
-      `${foundRider.name} is now allocated to order ${orderId}.`, 
-      "success"
-    );
-    setReassignRiderId("");
-    setShowReassignRiderDropdown(false);
+      triggerToast(
+        "Rider Dispatch Assigned", 
+        `${foundRider.name} is now allocated to order ${orderId}.`, 
+        "success"
+      );
+      setReassignRiderId("");
+      setShowReassignRiderDropdown(false);
+    } catch (err) {
+      console.error("Rider assignment error:", err);
+      triggerToast("Sync Error", "Failed to assign rider.", "error");
+    }
   };
 
-  const executeDeleteOrder = () => {
+  const executeDeleteOrder = async () => {
     if (!deleteOrderId) return;
     const orderIdToDelete = deleteOrderId;
-    setOrders(prev => prev.filter(o => o.id !== orderIdToDelete));
-    triggerToast("Order Expunged", `Corporate transaction records for ${orderIdToDelete} were permanently erased.`, "success");
-    setDeleteOrderId(null);
-    if (selectedExtendedOrderId === orderIdToDelete) {
-      setSelectedExtendedOrderId(null);
+    try {
+      await deleteOrder(orderIdToDelete);
+      triggerToast("Order Expunged", `Corporate transaction records for ${orderIdToDelete} were permanently erased.`, "success");
+      setDeleteOrderId(null);
+      if (selectedExtendedOrderId === orderIdToDelete) {
+        setSelectedExtendedOrderId(null);
+      }
+    } catch (err) {
+      console.error("Delete order error:", err);
+      triggerToast("Sync Error", "Failed to delete order node.", "error");
     }
   };
 
   // Cancel order confirm processing
-  const handleCancelSubmit = (e: React.FormEvent) => {
+  const handleCancelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cancelModalOrderId || !cancelCategory) {
       triggerToast("Form Verification Failed", "Please specify a cancellation reason category.", "error");
       return;
     }
 
-    setOrders(prev => prev.map(o => {
-      if (o.id === cancelModalOrderId) {
-        return { 
-          ...o, 
-          status: "Cancelled", 
-          cancelReason: `${cancelCategory} - ${cancelNotes || "No notes appended"}` 
-        };
+    try {
+      await updateOrder(cancelModalOrderId, { 
+        status: "Cancelled", 
+        cancelReason: `${cancelCategory} - ${cancelNotes || "No notes appended"}` 
+      });
+
+      // Generate dynamic broadcast alerts
+      triggerToast("Order Aborted", `Cancelled. System transmitted triggers to customer care & logistics.`, "error");
+      
+      // Close modal
+      setCancelModalOrderId(null);
+      setCancelCategory("");
+      setCancelNotes("");
+      setCancelConfirmedFlag(false);
+
+      // Sync drawer if needed
+      if (selectedExtendedOrderId === cancelModalOrderId) {
+        setSelectedExtendedOrderId(null);
       }
-      return o;
-    }));
-
-    // Generate dynamic broadcast alerts
-    triggerToast("Order Aborted", `Cancelled. System transmitted triggers to customer care & logistics.`, "error");
-    
-    // Close modal
-    setCancelModalOrderId(null);
-    setCancelCategory("");
-    setCancelNotes("");
-    setCancelConfirmedFlag(false);
-
-    // Sync drawer if needed
-    if (selectedExtendedOrderId === cancelModalOrderId) {
-      setSelectedExtendedOrderId(null);
+    } catch (err) {
+      console.error("Cancellation error:", err);
+      triggerToast("Sync Error", "Failed to abort order node.", "error");
     }
   };
 
@@ -350,33 +358,31 @@ export default function OrderManagementModule({
   };
 
   // Bulk actions
-  const triggerBulkAction = (action: "Accept" | "Deliver" | "Cancel") => {
+  const triggerBulkAction = async (action: "Accept" | "Deliver" | "Cancel") => {
     if (selectedTableOrderIds.length === 0) {
       triggerToast("No selections", "Select orders from table checks first.", "info");
       return;
     }
 
-    if (action === "Cancel") {
-      // Launch cancellation dropdown sequence or bulk process
-      setOrders(prev => prev.map(o => {
-        if (selectedTableOrderIds.includes(o.id)) {
-          return { ...o, status: "Cancelled", cancelReason: "Bulk corporate administrative drop" };
-        }
-        return o;
-      }));
-      triggerToast("Bulk Action Executed", `Cancelled ${selectedTableOrderIds.length} orders simultaneously.`, "error");
-    } else {
-      const nextStatus: OrderStatus = action === "Accept" ? "Preparing" : "Delivered";
-      setOrders(prev => prev.map(o => {
-        if (selectedTableOrderIds.includes(o.id)) {
-          return { ...o, status: nextStatus };
-        }
-        return o;
-      }));
-      triggerToast("Bulk Update Success", `Status for ${selectedTableOrderIds.length} orders updated to ${nextStatus}.`, "success");
+    try {
+      if (action === "Cancel") {
+        // Launch cancellation dropdown sequence or bulk process
+        await Promise.all(selectedTableOrderIds.map(id => 
+          updateOrder(id, { status: "Cancelled", cancelReason: "Bulk corporate administrative drop" })
+        ));
+        triggerToast("Bulk Action Executed", `Cancelled ${selectedTableOrderIds.length} orders simultaneously.`, "error");
+      } else {
+        const nextStatus: OrderStatus = action === "Accept" ? "Preparing" : "Delivered";
+        await Promise.all(selectedTableOrderIds.map(id => 
+          updateOrder(id, { status: nextStatus })
+        ));
+        triggerToast("Bulk Update Success", `Status for ${selectedTableOrderIds.length} orders updated to ${nextStatus}.`, "success");
+      }
+      setSelectedTableOrderIds([]);
+    } catch (err) {
+      console.error("Bulk action error:", err);
+      triggerToast("Sync Error", "Failed to execute bulk operations.", "error");
     }
-
-    setSelectedTableOrderIds([]);
   };
 
   // Export CSV Helper

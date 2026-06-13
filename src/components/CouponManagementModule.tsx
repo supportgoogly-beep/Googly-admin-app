@@ -402,6 +402,7 @@ export default function CouponManagementModule({
     }
 
     const updatedCoupon: Coupon = {
+      id: isEditing ? (coupons.find(c => c.code === editTargetCode)?.id || `coupon-${Date.now()}`) : `coupon-${Date.now()}`,
       code: uppercaseCode,
       title: formTitle || `${formType === "flat" ? "₹" + formValue : formValue + "%"} Off Promo Campaign`,
       type: formType,

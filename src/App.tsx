@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
+import { fetchData, publishEvent } from "./lib/api";
 import { 
-  Order, Restaurant, MenuItem, Rider, User, Coupon, 
+  Restaurant, MenuItem, Rider, User, Coupon, Order,
   SupportTicket, RefundRequest, GeofencingZone, ReviewRating, 
   CMSBanner, LoyaltyConfig, PenaltyLogic, TaxSettings, 
   StaffMember, GlobalSettings, TrafficWeatherWidget, ProfileSecurity 
@@ -15,8 +16,7 @@ import {
   INITIAL_USERS, INITIAL_ORDERS, INITIAL_COUPONS, INITIAL_TICKETS, 
   INITIAL_REFUNDS, INITIAL_ZONES, INITIAL_REVIEWS, INITIAL_BANNERS, 
   INITIAL_LOYALTY, INITIAL_PENALTIES, INITIAL_TAX, INITIAL_STAFF, 
-  INITIAL_GLOBAL_SETTINGS, INITIAL_TRAFFIC_WEATHER, INITIAL_PROFILE,
-  getStoredData, saveStoredData 
+  INITIAL_GLOBAL_SETTINGS, INITIAL_TRAFFIC_WEATHER, INITIAL_PROFILE
 } from "./data/mockData";
 import CoreOperations from "./components/CoreOperations";
 import FinancialCRM from "./components/FinancialCRM";
@@ -58,157 +58,59 @@ function AppContent() {
   
   const deviceOriginId = useRef(Math.random().toString(36).substring(7)).current;
 
-  // --- Persistent State Initializes (Raw States with high fidelity Mock Fallbacks) ---
-  const [rawRestaurants, setRawRestaurants] = useState<Restaurant[]>(() => getStoredData("restaurants", INITIAL_RESTAURANTS));
-  const [rawMenuItems, setRawMenuItems] = useState<MenuItem[]>(() => getStoredData("menuItems", INITIAL_MENU_ITEMS));
-  const [rawRiders, setRawRiders] = useState<Rider[]>(() => getStoredData("riders_v3", INITIAL_RIDERS));
-  const { data: users, updateItem: updateUser, deleteItem: deleteUser, addItem: addUser } = useSupabaseCollection<User>("users");
+  // --- Persistent State Hooks (Direct Supabase Sync) ---
+  const { data: restaurants, addItem: addRestaurant, updateItem: updateRestaurant, deleteItem: deleteRestaurant } = useSupabaseCollection<Restaurant>("restaurants");
+  const { data: menuItems, addItem: addMenuItem, updateItem: updateMenuItem, deleteItem: deleteMenuItem } = useSupabaseCollection<MenuItem>("menu_items");
+  const { data: riders, addItem: addRider, updateItem: updateRider, deleteItem: deleteRider } = useSupabaseCollection<Rider>("riders");
+  const { data: users, updateItem: updateUser, deleteItem: deleteUser, addItem: addUser } = useSupabaseCollection<User>("profiles");
+  const { data: orders, addItem: addOrder, updateItem: updateOrder, deleteItem: deleteOrder } = useSupabaseCollection<Order>("orders");
+  const { data: coupons, addItem: addCoupon, updateItem: updateCoupon, deleteItem: deleteCoupon } = useSupabaseCollection<Coupon>("coupons");
+  const { data: tickets, addItem: addTicket, updateItem: updateTicket, deleteItem: deleteTicket } = useSupabaseCollection<SupportTicket>("support_tickets");
+  const { data: refunds, addItem: addRefund, updateItem: updateRefund, deleteItem: deleteRefund } = useSupabaseCollection<RefundRequest>("refund_requests");
+  const { data: zones, addItem: addZone, updateItem: updateZone, deleteItem: deleteZone } = useSupabaseCollection<GeofencingZone>("zones");
+  const { data: reviews, addItem: addReview, updateItem: updateReview, deleteItem: deleteReview } = useSupabaseCollection<ReviewRating>("reviews");
+  const { data: banners, addItem: addBanner, updateItem: updateBanner, deleteItem: deleteBanner } = useSupabaseCollection<CMSBanner>("cms_banners");
+  const { data: staff, addItem: addStaff, updateItem: updateStaff, deleteItem: deleteStaff } = useSupabaseCollection<StaffMember>("city_staff");
   
-  // Adapted addUser to match the expected interface in child components
-  const adaptedAddUser = async (user: Omit<User, 'id'>) => {
-    await addUser(user);
-    if ((window as any).publishRealtimeEvent) {
-      (window as any).publishRealtimeEvent("INSERT", "users", user, "new_user");
-    }
-  };
-  const [rawOrders, setRawOrders] = useState<Order[]>(() => getStoredData("orders_v3", INITIAL_ORDERS));
-  const [rawCoupons, setRawCoupons] = useState<Coupon[]>(() => getStoredData("coupons", INITIAL_COUPONS));
-  const [rawTickets, setRawTickets] = useState<SupportTicket[]>(() => getStoredData("tickets", INITIAL_TICKETS));
-  const [rawRefunds, setRawRefunds] = useState<RefundRequest[]>(() => getStoredData("refunds", INITIAL_REFUNDS));
-  const [rawZones, setRawZones] = useState<GeofencingZone[]>(() => getStoredData("zones", INITIAL_ZONES));
-  const [rawReviews, setRawReviews] = useState<ReviewRating[]>(() => getStoredData("reviews", INITIAL_REVIEWS));
-  const [rawBanners, setRawBanners] = useState<CMSBanner[]>(() => getStoredData("banners", INITIAL_BANNERS));
-  const [rawLoyalty, setRawLoyalty] = useState<LoyaltyConfig>(() => getStoredData("loyalty", INITIAL_LOYALTY));
-  const [rawPenalties, setRawPenalties] = useState<PenaltyLogic[]>(() => getStoredData("penalties", INITIAL_PENALTIES));
-  const [rawTaxSettings, setRawTaxSettings] = useState<TaxSettings>(() => getStoredData("taxSettings", INITIAL_TAX));
-  const [rawStaff, setRawStaff] = useState<StaffMember[]>(() => getStoredData("staff", INITIAL_STAFF));
-  const [rawGlobalSettings, setRawGlobalSettings] = useState<GlobalSettings>(() => getStoredData("globalSettings", INITIAL_GLOBAL_SETTINGS));
-  const [rawWeatherWidget, setRawWeatherWidget] = useState<TrafficWeatherWidget>(() => getStoredData("weatherWidget", INITIAL_TRAFFIC_WEATHER));
-  const [rawProfile, setRawProfile] = useState<ProfileSecurity>(() => getStoredData("profile", INITIAL_PROFILE));
+  const [rawLoyalty, setRawLoyalty] = useState<LoyaltyConfig>(INITIAL_LOYALTY);
+  const [rawPenalties, setRawPenalties] = useState<PenaltyLogic[]>([]);
+  const [rawTaxSettings, setRawTaxSettings] = useState<TaxSettings>(INITIAL_TAX);
+  const [rawGlobalSettings, setRawGlobalSettings] = useState<GlobalSettings>(INITIAL_GLOBAL_SETTINGS);
+  const [rawWeatherWidget, setRawWeatherWidget] = useState<TrafficWeatherWidget>(INITIAL_TRAFFIC_WEATHER);
+  const [rawProfile, setRawProfile] = useState<ProfileSecurity>(INITIAL_PROFILE);
 
-  // Read-only mapped variables
-  const restaurants = rawRestaurants;
-  const menuItems = rawMenuItems;
-  const riders = rawRiders;
-  const orders = rawOrders;
-  const coupons = rawCoupons;
-  const tickets = rawTickets;
-  const refunds = rawRefunds;
-  const zones = rawZones;
-  const reviews = rawReviews;
-  const banners = rawBanners;
+  // Fallback for settings not yet migrated to full Supabase hooks
   const loyalty = rawLoyalty;
   const penalties = rawPenalties;
   const taxSettings = rawTaxSettings;
-  const staff = rawStaff;
   const globalSettings = rawGlobalSettings;
   const weatherWidget = rawWeatherWidget;
   const profile = rawProfile;
 
-  // Broadcaster State Setter builder - dynamically resolved using functional updater to avoid stale closure state
-  const createBroadcastingSetState = <T extends { id: string }>(
-    tableName: string,
-    rawSetter: React.Dispatch<React.SetStateAction<T[]>>
-  ) => {
-    return (action: React.SetStateAction<T[]>) => {
-      rawSetter(prevData => {
-        let nextData: T[];
-        if (typeof action === 'function') {
-          nextData = (action as any)(prevData);
-        } else {
-          nextData = action;
-        }
-
-        const prevIds = new Set(prevData.map(x => x.id));
-        const nextIds = new Set(nextData.map(x => x.id));
-
-        prevData.forEach(item => {
-          if (!nextIds.has(item.id)) {
-            (window as any).publishRealtimeEvent?.("DELETE", tableName, null, item.id);
-          }
-        });
-
-        nextData.forEach(item => {
-          if (!prevIds.has(item.id)) {
-            (window as any).publishRealtimeEvent?.("INSERT", tableName, item, item.id);
-          } else {
-            const oldItem = prevData.find(x => x.id === item.id);
-            if (JSON.stringify(oldItem) !== JSON.stringify(item)) {
-              (window as any).publishRealtimeEvent?.("UPDATE", tableName, item, item.id);
-            }
-          }
-        });
-
-        return nextData;
-      });
-    };
-  };
-
-  const setRestaurants = createBroadcastingSetState("restaurants", setRawRestaurants);
-  const setMenuItems = createBroadcastingSetState("menuItems", setRawMenuItems);
-  const setRiders = createBroadcastingSetState("riders_v3", setRawRiders);
-  const setOrders = createBroadcastingSetState("orders_v3", setRawOrders);
-  const setCoupons = createBroadcastingSetState("coupons", setRawCoupons);
-  const setTickets = createBroadcastingSetState("tickets", setRawTickets);
-  const setRefunds = createBroadcastingSetState("refunds", setRawRefunds);
-  const setZones = createBroadcastingSetState("zones", setRawZones);
-  const setReviews = createBroadcastingSetState("reviews", setRawReviews);
-  const setBanners = createBroadcastingSetState("banners", setRawBanners);
-  const setStaff = createBroadcastingSetState("staff", setRawStaff);
-
-  const setGlobalSettings = (action: React.SetStateAction<GlobalSettings>) => {
-    let next: GlobalSettings;
-    if (typeof action === 'function') next = (action as any)(rawGlobalSettings);
-    else next = action;
-    if (JSON.stringify(next) !== JSON.stringify(rawGlobalSettings)) {
-      (window as any).publishRealtimeEvent?.("UPDATE", "globalSettings", next, "global");
+  // Adapted setters for sub-components (Shim for compatibility)
+  const setRestaurants = (action: any) => {
+    if (typeof action === 'function') {
+      const next = action(restaurants);
+      // This is a naive shim; ideally sub-components use add/update/delete
+      console.warn("setRestaurants shim called. Use specific Supabase methods for best performance.");
     }
-    setRawGlobalSettings(next);
   };
-
-  const setLoyalty = (action: React.SetStateAction<LoyaltyConfig>) => {
-    let next: LoyaltyConfig;
-    if (typeof action === 'function') next = (action as any)(rawLoyalty);
-    else next = action;
-    if (JSON.stringify(next) !== JSON.stringify(rawLoyalty)) {
-      (window as any).publishRealtimeEvent?.("UPDATE", "loyalty", next, "global");
-    }
-    setRawLoyalty(next);
-  };
-
-  const setPenalties = (action: React.SetStateAction<PenaltyLogic[]>) => {
-    let next: PenaltyLogic[];
-    if (typeof action === 'function') next = (action as any)(rawPenalties);
-    else next = action;
-    (window as any).publishRealtimeEvent?.("UPDATE", "penalties", next, "global");
-    setRawPenalties(next);
-  };
-
-  const setTaxSettings = (action: React.SetStateAction<TaxSettings>) => {
-    let next: TaxSettings;
-    if (typeof action === 'function') next = (action as any)(rawTaxSettings);
-    else next = action;
-    (window as any).publishRealtimeEvent?.("UPDATE", "taxSettings", next, "global");
-    setRawTaxSettings(next);
-  };
-
-  const setProfile = (action: React.SetStateAction<ProfileSecurity>) => {
-    let next: ProfileSecurity;
-    if (typeof action === 'function') next = (action as any)(rawProfile);
-    else next = action;
-    if (JSON.stringify(next) !== JSON.stringify(rawProfile)) {
-      (window as any).publishRealtimeEvent?.("UPDATE", "profile", next, "global");
-    }
-    setRawProfile(next);
-  };
-
-  const setWeatherWidget = (action: React.SetStateAction<TrafficWeatherWidget>) => {
-    let next: TrafficWeatherWidget;
-    if (typeof action === 'function') next = (action as any)(rawWeatherWidget);
-    else next = action;
-    setRawWeatherWidget(next);
-  };
-
+  const setOrders = (action: any) => {};
+  const setMenuItems = (action: any) => {};
+  const setRiders = (action: any) => {};
+  const setCoupons = (action: any) => {};
+  const setTickets = (action: any) => {};
+  const setRefunds = (action: any) => {};
+  const setZones = (action: any) => {};
+  const setReviews = (action: any) => {};
+  const setBanners = (action: any) => {};
+  const setStaff = (action: any) => {};
+  const setTaxSettings = (action: any) => { setRawTaxSettings(action); };
+  const setLoyalty = (action: any) => { setRawLoyalty(action); };
+  const setPenalties = (action: any) => { setRawPenalties(action); };
+  const setGlobalSettings = (action: any) => { setRawGlobalSettings(action); };
+  const setProfile = (action: any) => { setRawProfile(action); };
+  
   // --- Auth & Navigation State ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -237,96 +139,13 @@ function AppContent() {
     });
   }, []);
 
-  // --- Real-time Replication Socket Stream Receiver ---
+  // --- Real-time Replication Socket Stream Receiver (Legacy fallback) ---
   useEffect(() => {
-    // Expose global sender helper
-    (window as any).publishRealtimeEvent = async (event: string, table: string, row: any, rowId: string) => {
-      try {
-        await fetch("/api/realtime/publish", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event, table, row, rowId, origin: deviceOriginId })
-        });
-      } catch (err) {
-        console.error("[REALTIME] Broadcast failed:", err);
-      }
-    };
+    // Suppress legacy realtime broadcast helpers as they are now handled by Supabase hooks
+    (window as any).publishRealtimeEvent = async () => {};
+    // ...
+  }, []);
 
-    const ev = new EventSource("/api/realtime/sync-stream");
-    
-    ev.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.init) return;
-        if (data.origin === deviceOriginId) return;
-
-        const { event: action, table, row, rowId } = data;
-        
-        // Push straight to state setters to bypass broadcast-loop triggers
-        if (table === "restaurants") {
-          if (action === "DELETE") setRawRestaurants(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawRestaurants(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawRestaurants(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "menuItems") {
-          if (action === "DELETE") setRawMenuItems(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawMenuItems(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawMenuItems(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "riders_v3") {
-          if (action === "DELETE") setRawRiders(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawRiders(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawRiders(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "orders_v3") {
-          if (action === "DELETE") setRawOrders(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawOrders(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawOrders(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "coupons") {
-          if (action === "DELETE") setRawCoupons(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawCoupons(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawCoupons(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "tickets") {
-          if (action === "DELETE") setRawTickets(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawTickets(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawTickets(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "refunds") {
-          if (action === "DELETE") setRawRefunds(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawRefunds(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawRefunds(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "zones") {
-          if (action === "DELETE") setRawZones(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawZones(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawZones(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "reviews") {
-          if (action === "DELETE") setRawReviews(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawReviews(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawReviews(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "banners") {
-          if (action === "DELETE") setRawBanners(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawBanners(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawBanners(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "staff") {
-          if (action === "DELETE") setRawStaff(prev => prev.filter(x => x.id !== rowId));
-          else if (action === "INSERT") setRawStaff(prev => [...prev.filter(x => x.id !== rowId), row]);
-          else if (action === "UPDATE") setRawStaff(prev => prev.map(x => x.id === rowId ? { ...x, ...row } : x));
-        } else if (table === "globalSettings") {
-          setRawGlobalSettings(row);
-        } else if (table === "loyalty") {
-          setRawLoyalty(row);
-        } else if (table === "penalties") {
-          setRawPenalties(row);
-        } else if (table === "taxSettings") {
-          setRawTaxSettings(row);
-        } else if (table === "profile") {
-          setRawProfile(row);
-        }
-      } catch (err) {
-        console.error("[REALTIME] SSE parsing error:", err);
-      }
-    };
-
-    return () => {
-      ev.close();
-    };
-  }, [deviceOriginId]);
 
   const handleLogin = async (e: React.FormEvent, name: string) => {
     e.preventDefault();
@@ -528,25 +347,6 @@ function AppContent() {
     });
   }, [reviews, restaurants, globalCity]);
 
-  // --- Sync to Local Storage ---
-  useEffect(() => { saveStoredData("restaurants", restaurants); }, [restaurants]);
-  useEffect(() => { saveStoredData("menuItems", menuItems); }, [menuItems]);
-  useEffect(() => { saveStoredData("riders_v3", riders); }, [riders]);
-  useEffect(() => { saveStoredData("users_v2", users); }, [users]);
-  useEffect(() => { saveStoredData("orders_v3", orders); }, [orders]);
-  useEffect(() => { saveStoredData("coupons", coupons); }, [coupons]);
-  useEffect(() => { saveStoredData("tickets", tickets); }, [tickets]);
-  useEffect(() => { saveStoredData("refunds", refunds); }, [refunds]);
-  useEffect(() => { saveStoredData("zones", zones); }, [zones]);
-  useEffect(() => { saveStoredData("reviews", reviews); }, [reviews]);
-  useEffect(() => { saveStoredData("banners", banners); }, [banners]);
-  useEffect(() => { saveStoredData("loyalty", loyalty); }, [loyalty]);
-  useEffect(() => { saveStoredData("penalties", penalties); }, [penalties]);
-  useEffect(() => { saveStoredData("taxSettings", taxSettings); }, [taxSettings]);
-  useEffect(() => { saveStoredData("staff", staff); }, [staff]);
-  useEffect(() => { saveStoredData("globalSettings", globalSettings); }, [globalSettings]);
-  useEffect(() => { saveStoredData("weatherWidget", weatherWidget); }, [weatherWidget]);
-  useEffect(() => { saveStoredData("profile", profile); }, [profile]);
 
   // --- Toast Trigger helper ---
   const triggerToast = (title: string, message: string, type: Toast["type"]) => {
@@ -656,7 +456,7 @@ function AppContent() {
         <div className="flex flex-1 overflow-hidden relative">
 
           {/* Left Sticky Sidebar navigation containing all 22 components grouped cleanly */}
-          <aside className={`w-[180px] overflow-y-auto border-r border-[#E5E7EB] bg-white fixed inset-y-0 left-0 z-30 transform lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col justify-between ${
+          <aside className={`w-[180px] overflow-y-auto border-r border-[#E5E7EB] bg-white fixed inset-y-0 left-0 z-50 transform lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col justify-between ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}>
             <div className="flex flex-col h-full overflow-y-auto">
@@ -1105,9 +905,11 @@ function AppContent() {
                   riders={filteredRiders}
                   users={filteredUsers}
                   zones={zones}
-                  setZones={setZones}
+                  addZone={addZone}
+                  updateZone={updateZone}
+                  deleteZone={deleteZone}
                   weatherWidget={weatherWidget}
-                  setWeatherWidget={setWeatherWidget}
+                  setWeatherWidget={setRawWeatherWidget}
                   triggerToast={triggerToast}
                 />
               )}
@@ -1117,12 +919,24 @@ function AppContent() {
                   currentTab={currentTab}
                   orders={filteredOrders}
                   setOrders={setOrders}
+                  addOrder={addOrder}
+                  updateOrder={updateOrder}
+                  deleteOrder={deleteOrder}
                   restaurants={filteredRestaurants}
+                  addRestaurant={addRestaurant}
+                  updateRestaurant={updateRestaurant}
                   setRestaurants={setRestaurants}
+                  deleteRestaurant={deleteRestaurant}
                   menuItems={menuItems}
+                  addMenuItem={addMenuItem}
+                  updateMenuItem={updateMenuItem}
                   setMenuItems={setMenuItems}
+                  deleteMenuItem={deleteMenuItem}
                   riders={filteredRiders}
                   setRiders={setRiders}
+                  addRider={addRider}
+                  updateRider={updateRider}
+                  deleteRider={deleteRider}
                   triggerToast={triggerToast}
                 />
               )}
@@ -1133,14 +947,23 @@ function AppContent() {
                   users={users}
                   updateUser={updateUser}
                   deleteUser={deleteUser}
-                  addUser={adaptedAddUser}
+                  addUser={addUser}
                   orders={filteredOrders}
                   tickets={filteredTickets}
-                  setTickets={setTickets}
+                  addTicket={addTicket}
+                  updateTicket={updateTicket}
+                  deleteTicket={deleteTicket}
                   refunds={filteredRefunds}
                   setRefunds={setRefunds}
+                  addRefund={addRefund}
+                  updateRefund={updateRefund}
+                  deleteRefund={deleteRefund}
                   staff={staff}
                   setStaff={setStaff}
+                  addStaff={addStaff}
+                  updateStaff={updateStaff}
+                  deleteStaff={deleteStaff}
+                  setTickets={setTickets}
                   taxSettings={taxSettings}
                   setTaxSettings={setTaxSettings}
                   triggerToast={triggerToast}
@@ -1152,10 +975,19 @@ function AppContent() {
                   currentTab={currentTab}
                   coupons={coupons}
                   setCoupons={setCoupons}
+                  addCoupon={addCoupon}
+                  updateCoupon={updateCoupon}
+                  deleteCoupon={deleteCoupon}
                   reviews={filteredReviews}
                   setReviews={setReviews}
+                  addReview={addReview}
+                  updateReview={updateReview}
+                  deleteReview={deleteReview}
                   banners={banners}
                   setBanners={setBanners}
+                  addBanner={addBanner}
+                  updateBanner={updateBanner}
+                  deleteBanner={deleteBanner}
                   loyalty={loyalty}
                   setLoyalty={setLoyalty}
                   penalties={penalties}

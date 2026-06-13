@@ -136,11 +136,161 @@ if (process.env.SMTP_HOST && process.env.SMTP_HOST.includes('@')) {
 // In-memory store for OTPs (Demo only - use Redis/DB for production)
 const otpStore = new Map<string, { otp: string, timestamp: number }>();
 
+// --- UNIFIED PERSISTENT DATABASE ENGINE ---
+const dataStorePath = path.join(__dirname, "data_store.json");
+
+const DEFAULT_STORE = {
+  restaurants: [],
+  menuItems: [],
+  riders_v3: [],
+  orders_v3: [],
+  coupons: [],
+  tickets: [],
+  refunds: [],
+  zones: [],
+  reviews: [],
+  banners: [],
+  loyalty: {
+    pointsPerHundredRs: 10,
+    pointRedemptionValue: 1.0,
+    tierThresholds: { silver: 100, gold: 500, platinum: 1000 },
+    welcomeBonus: 50,
+    active: true
+  },
+  penalties: [],
+  taxSettings: {
+    gstPercent: 0,
+    serviceTaxPercent: 0,
+    deliveryTaxPercent: 0
+  },
+  staff: [],
+  globalSettings: {
+    forceAppUpdate: false,
+    maintenanceMode: false,
+    enableCOD: true,
+    minOrderValue: 0
+  },
+  weatherWidget: {
+    location: "None",
+    weather: "Sunny",
+    trafficDensity: "Normal",
+    temperature: 30
+  },
+  profile: {
+    name: "Admin",
+    email: "admin@googlydelivery.in",
+    twoFactorEnabled: false,
+    passwordChangedAt: new Date().toISOString()
+  },
+  cities: []
+};
+
+async function ensureDataStoreFile() {
+  try {
+    await fs.access(dataStorePath);
+  } catch {
+    await fs.writeFile(dataStorePath, JSON.stringify(DEFAULT_STORE, null, 2), "utf-8");
+  }
+}
+
+async function getDataStore(): Promise<any> {
+  await ensureDataStoreFile();
+  try {
+    // 1. Attempt to fetch from Firestore first for robust cloud-hosted backup
+    try {
+      if (admin.apps.length > 0) {
+        const db = admin.firestore();
+        const collections = [
+          "restaurants", "menuItems", "riders_v3", "orders_v3", "coupons", 
+          "tickets", "refunds", "zones", "reviews", "banners", "loyalty", 
+          "penalties", "taxSettings", "staff", "globalSettings", "weatherWidget", 
+          "profile", "cities"
+        ];
+        const store: any = { ...DEFAULT_STORE };
+        let hasCloudData = false;
+
+        for (const col of collections) {
+          const docRef = db.collection("googly_store").doc(col);
+          const docSnap = await docRef.get();
+          if (docSnap.exists) {
+            store[col] = docSnap.data()?.data;
+            hasCloudData = true;
+          }
+        }
+        if (hasCloudData) {
+          // Sync update local file cache
+          await fs.writeFile(dataStorePath, JSON.stringify(store, null, 2), "utf-8");
+          return store;
+        }
+      }
+    } catch (e) {
+      // Failover to local file fetch
+    }
+
+    // 2. Fetch from local file
+    const content = await fs.readFile(dataStorePath, "utf-8");
+    return JSON.parse(content);
+  } catch (err) {
+    return DEFAULT_STORE;
+  }
+}
+
+async function saveDataStore(data: any) {
+  try {
+    // Save to filesystem to prevent any data loss
+    await fs.writeFile(dataStorePath, JSON.stringify(data, null, 2), "utf-8");
+
+    // Sync to cloud Firestore if authenticated
+    try {
+      if (admin.apps.length > 0) {
+        const db = admin.firestore();
+        const collections = [
+          "restaurants", "menuItems", "riders_v3", "orders_v3", "coupons", 
+          "tickets", "refunds", "zones", "reviews", "banners", "loyalty", 
+          "penalties", "taxSettings", "staff", "globalSettings", "weatherWidget", 
+          "profile", "cities"
+        ];
+        for (const col of collections) {
+          if (data[col] !== undefined) {
+            await db.collection("googly_store").doc(col).set({
+              data: data[col],
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }
+      }
+    } catch (firestoreErr) {
+      // Fail silently and rely on the robust local file storage
+    }
+  } catch (err) {
+    console.error("[DATABASE] Synchronization failure:", err);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  // --- UNIFIED DATABASE RECONCILIATION ROUTE ---
+  app.get("/api/data/load", async (req, res) => {
+    try {
+      const dbState = await getDataStore();
+      res.json(dbState);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/data/reset", async (req, res) => {
+    try {
+      await saveDataStore(DEFAULT_STORE);
+      res.json({ success: true, message: "Database reset to empty state." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // --- REAL-TIME REPLICATION & MULTI-DEVICE BROADCAST HUB (SSE) ---
   const sseClients = new Set<any>();
@@ -162,10 +312,45 @@ async function startServer() {
     });
   });
 
-  app.post("/api/realtime/publish", (req, res) => {
+  app.post("/api/realtime/publish", async (req, res) => {
     const { event, table, row, rowId, origin } = req.body;
+
+    // Persist event into database state
+    try {
+      const data = await getDataStore();
+      if (Array.isArray(data[table])) {
+        if (event === "DELETE") {
+          data[table] = data[table].filter((x: any) => x.id !== rowId);
+        } else if (event === "INSERT") {
+          data[table] = [...data[table].filter((x: any) => x.id !== rowId), row];
+        } else if (event === "UPDATE") {
+          data[table] = data[table].map((x: any) => x.id === rowId ? { ...x, ...row } : x);
+        }
+      } else {
+        // Singular settings / tables
+        if (table === "cities" && Array.isArray(row)) {
+          data["cities"] = row;
+        } else if (table === "globalSettings") {
+          data["globalSettings"] = row;
+        } else if (table === "loyalty") {
+          data["loyalty"] = row;
+        } else if (table === "penalties") {
+          data["penalties"] = row;
+        } else if (table === "taxSettings") {
+          data["taxSettings"] = row;
+        } else if (table === "profile") {
+          data["profile"] = row;
+        } else if (table === "weatherWidget") {
+          data["weatherWidget"] = row;
+        }
+      }
+      await saveDataStore(data);
+    } catch (dbErr) {
+      console.error("[REALTIME-SINK] Error reflecting modification to persistent storage:", dbErr);
+    }
+
+    // Broadcast change to all clients
     const payload = JSON.stringify({ event, table, row, rowId, origin });
-    
     let counter = 0;
     sseClients.forEach((client) => {
       try {

@@ -3,6 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface City {
+  id: string;
+  name: string;
+  pincode_prefix: string;
+  created_at?: string;
+}
+
+export interface Area {
+  id: string;
+  city_id: string;
+  name: string;
+  pincode: string;
+  created_at?: string;
+}
+
 export interface OrderItem {
   id: string;
   name: string;
@@ -163,6 +178,7 @@ export interface User {
 export type CouponType = "percentage" | "flat";
 
 export interface Coupon {
+  id: string;
   code: string;
   title: string;
   type: CouponType;

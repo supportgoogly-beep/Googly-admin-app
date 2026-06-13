@@ -25,13 +25,25 @@ import {
 interface CoreOperationsProps {
   currentTab: string;
   orders: Order[];
-  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+  addOrder: (item: Omit<Order, 'id'>) => Promise<any>;
+  setOrders: (action: any) => void;
+  updateOrder: (id: string, updates: Partial<Order>) => Promise<void>;
+  deleteOrder: (id: string) => Promise<void>;
   restaurants: Restaurant[];
-  setRestaurants: React.Dispatch<React.SetStateAction<Restaurant[]>>;
+  addRestaurant: (item: Omit<Restaurant, 'id'>) => Promise<any>;
+  updateRestaurant: (id: string, updates: Partial<Restaurant>) => Promise<void>;
+  deleteRestaurant: (id: string) => Promise<void>;
+  setRestaurants: (action: any) => void;
   menuItems: MenuItem[];
-  setMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>>;
+  addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<any>;
+  updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
+  deleteMenuItem: (id: string) => Promise<void>;
+  setMenuItems: (action: any) => void;
   riders: Rider[];
-  setRiders: React.Dispatch<React.SetStateAction<Rider[]>>;
+  setRiders: (action: any) => void;
+  addRider: (item: Omit<Rider, 'id'>) => Promise<any>;
+  updateRider: (id: string, updates: Partial<Rider>) => Promise<void>;
+  deleteRider: (id: string) => Promise<void>;
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
 }
 
@@ -39,12 +51,24 @@ export default function CoreOperations({
   currentTab,
   orders,
   setOrders,
+  addOrder,
+  updateOrder,
+  deleteOrder,
   restaurants,
+  addRestaurant,
+  updateRestaurant,
+  deleteRestaurant,
   setRestaurants,
   menuItems,
+  addMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
   setMenuItems,
   riders,
   setRiders,
+  addRider,
+  updateRider,
+  deleteRider,
   triggerToast
 }: CoreOperationsProps) {
 
@@ -436,6 +460,8 @@ export default function CoreOperations({
         <OrderManagementModule
           orders={orders}
           setOrders={setOrders}
+          updateOrder={updateOrder}
+          deleteOrder={deleteOrder}
           restaurants={restaurants}
           riders={riders}
           triggerToast={triggerToast}
@@ -1167,6 +1193,9 @@ export default function CoreOperations({
         <MenuManagementModule
           restaurants={restaurants}
           menuItems={menuItems}
+          addMenuItem={addMenuItem}
+          updateMenuItem={updateMenuItem}
+          deleteMenuItem={deleteMenuItem}
           setMenuItems={setMenuItems}
           triggerToast={triggerToast}
         />

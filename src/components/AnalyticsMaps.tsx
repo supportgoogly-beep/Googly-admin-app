@@ -33,7 +33,9 @@ interface AnalyticsMapsProps {
   riders: Rider[];
   users: User[];
   zones: GeofencingZone[];
-  setZones: React.Dispatch<React.SetStateAction<GeofencingZone[]>>;
+  addZone: (item: Omit<GeofencingZone, 'id'>) => Promise<any>;
+  updateZone: (id: string, updates: Partial<GeofencingZone>) => Promise<void>;
+  deleteZone: (id: string) => Promise<void>;
   weatherWidget: TrafficWeatherWidget;
   setWeatherWidget: React.Dispatch<React.SetStateAction<TrafficWeatherWidget>>;
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
@@ -47,13 +49,15 @@ export default function AnalyticsMaps({
   riders,
   users,
   zones,
-  setZones,
+  addZone,
+  updateZone,
+  deleteZone,
   weatherWidget,
   setWeatherWidget,
   triggerToast
 }: AnalyticsMapsProps) {
 
-  // --- Dynamic Pricing / Surge State ---
+  const setZones = (action: any) => { console.warn("Shim setZones called"); };
   const [surgeMaster, setSurgeMaster] = useState(true);
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.5);
   const [selectedSurgeZones, setSelectedSurgeZones] = useState<string[]>(["zone-2"]);
@@ -168,8 +172,7 @@ export default function AnalyticsMaps({
     }
 
     const nextId = `zone-${Date.now()}`;
-    const cleanZone: GeofencingZone = {
-      id: nextId,
+    const cleanZone: Omit<GeofencingZone, 'id'> = {
       name: newZoneName,
       polygon: draftPoints,
       active: true,
@@ -178,7 +181,7 @@ export default function AnalyticsMaps({
       surgeMultiplier: 1.0
     };
 
-    setZones([...zones, cleanZone]);
+    addZone(cleanZone);
     triggerToast("Delivery Zone Drawn", `Geofence perimeter for ${cleanZone.name} is now live!`, "success");
     setNewZoneName("");
     setDraftPoints([]);

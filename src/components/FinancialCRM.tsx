@@ -22,14 +22,23 @@ interface FinancialCRMProps {
   users: User[];
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
-  addUser: (user: Omit<User, 'id'>) => Promise<void>;
+  addUser: (user: Omit<User, 'id'>) => Promise<any>;
   orders: Order[];
   tickets: SupportTicket[];
-  setTickets: React.Dispatch<React.SetStateAction<SupportTicket[]>>;
+  addTicket: (item: Omit<SupportTicket, 'id'>) => Promise<any>;
+  updateTicket: (id: string, updates: Partial<SupportTicket>) => Promise<void>;
+  deleteTicket: (id: string) => Promise<void>;
   refunds: RefundRequest[];
   setRefunds: React.Dispatch<React.SetStateAction<RefundRequest[]>>;
+  addRefund: (item: Omit<RefundRequest, 'id'>) => Promise<any>;
+  updateRefund: (id: string, updates: Partial<RefundRequest>) => Promise<void>;
+  deleteRefund: (id: string) => Promise<void>;
   staff: StaffMember[];
   setStaff: React.Dispatch<React.SetStateAction<StaffMember[]>>;
+  addStaff: (item: Omit<StaffMember, 'id'>) => Promise<any>;
+  updateStaff: (id: string, updates: Partial<StaffMember>) => Promise<void>;
+  deleteStaff: (id: string) => Promise<void>;
+  setTickets: React.Dispatch<React.SetStateAction<SupportTicket[]>>;
   taxSettings: TaxSettings;
   setTaxSettings: React.Dispatch<React.SetStateAction<TaxSettings>>;
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
@@ -43,11 +52,20 @@ export default function FinancialCRM({
   addUser,
   orders,
   tickets,
-  setTickets,
+  addTicket,
+  updateTicket,
+  deleteTicket,
   refunds,
   setRefunds,
+  addRefund,
+  updateRefund,
+  deleteRefund,
   staff,
   setStaff,
+  addStaff,
+  updateStaff,
+  deleteStaff,
+  setTickets,
   taxSettings,
   setTaxSettings,
   triggerToast
