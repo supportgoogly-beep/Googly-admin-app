@@ -42,6 +42,7 @@ interface FinancialCRMProps {
   taxSettings: TaxSettings;
   setTaxSettings: React.Dispatch<React.SetStateAction<TaxSettings>>;
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
+  currentUserEmail?: string;
 }
 
 export default function FinancialCRM({
@@ -68,7 +69,8 @@ export default function FinancialCRM({
   setTickets,
   taxSettings,
   setTaxSettings,
-  triggerToast
+  triggerToast,
+  currentUserEmail
 }: FinancialCRMProps) {
 
   // --- User Management State ---
@@ -155,6 +157,15 @@ export default function FinancialCRM({
   // Add staff trigger
   const handleCreateStaff = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Security Verification: Only the registered owner can add staff
+    const ownerEmail = "ruhandharpurkayastha@gmail.com";
+    if (currentUserEmail?.toLowerCase() !== ownerEmail) {
+      triggerToast("Permission Denied", "Only the primary registry owner can appoint new staff nodes.", "error");
+      setShowAddStaffModal(false);
+      return;
+    }
+
     const cleanStaff: StaffMember = {
       id: `staff-${Date.now()}`,
       name: newStaffForm.name || "Operations Representative",
@@ -257,6 +268,7 @@ export default function FinancialCRM({
           addStaff={addStaff}
           updateStaff={updateStaff}
           deleteStaff={deleteStaff}
+          currentUserEmail={currentUserEmail}
         />
       )}
 

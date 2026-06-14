@@ -7,18 +7,27 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import { promises as fs } from "fs";
 import { createClient } from "@supabase/supabase-js";
+import multer from "multer";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Configuration for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
 
 // Lazy init Supabase client for safe server operations
 let _supabaseClient: any = null;
 function getSupabaseClient() {
   if (!_supabaseClient) {
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-    if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith("http")) {
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    if (supabaseUrl && supabaseKey && supabaseUrl.startsWith("http")) {
       try {
-        _supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+        _supabaseClient = createClient(supabaseUrl, supabaseKey);
       } catch (e) {
         console.warn("Failed to initialize Supabase client on server-side ambiently:", e);
       }
@@ -302,6 +311,53 @@ async function startServer() {
       await saveDataStore(DEFAULT_STORE);
       res.json({ success: true, message: "Database reset to empty state." });
     } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- SUPABASE STORAGE UPLOAD ENDPOINT ---
+  app.post("/api/storage/upload", upload.single("file"), async (req, res) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        throw new Error("Supabase client not initialized. Check your environment variables.");
+      }
+
+      const bucketName = process.env.SUPABASE_BUCKET_NAME || "photos";
+      const fileExt = path.extname(file.originalname);
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+
+      console.log(`[STORAGE] File uploaded successfully: ${publicUrl}`);
+      res.json({ 
+        success: true, 
+        url: publicUrl,
+        path: filePath,
+        name: fileName
+      });
+    } catch (err: any) {
+      console.error("[STORAGE] Upload failure:", err);
       res.status(500).json({ error: err.message });
     }
   });

@@ -185,6 +185,7 @@ export default function GeofencingManagementSystem({
   // Save areas to localStorage and propagate mapped updates back to zones state dynamically
   useEffect(() => {
     localStorage.setItem("googly_geofencing_areas", JSON.stringify(areas));
+    window.dispatchEvent(new Event("geofencing_areas_changed"));
 
     // Only map areas for the active city to match with the filtered zones prop!
     const activeCityAreas = areas.filter(
@@ -248,6 +249,24 @@ export default function GeofencingManagementSystem({
       return prevAreas;
     });
   }, [cities]);
+
+  // Listen for sync from AreaManagement
+  useEffect(() => {
+    const handleSync = () => {
+      const saved = localStorage.getItem("googly_geofencing_areas");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setAreas(prev => {
+            if (JSON.stringify(prev) === saved) return prev;
+            return parsed;
+          });
+        } catch (e) {}
+      }
+    };
+    window.addEventListener("geofencing_areas_changed", handleSync);
+    return () => window.removeEventListener("geofencing_areas_changed", handleSync);
+  }, []);
 
   // Handle incoming real-time zone replica sync alerts safely
   useEffect(() => {
@@ -851,11 +870,19 @@ export default function GeofencingManagementSystem({
         );
         const resolvedCityId = currentCityObj?.id || "cc386617-640a-428a-8be5-6dfbcddc7821";
 
+        // Calculate approximate center location for AreaManagement map syncing
+        const lats = finalZone.points.map(p => p[0]);
+        const lons = finalZone.points.map(p => p[1]);
+        const centerLat = lats.length > 0 ? lats.reduce((a, b) => a + b, 0) / lats.length : null;
+        const centerLon = lons.length > 0 ? lons.reduce((a, b) => a + b, 0) / lons.length : null;
+
         addAreaSync({
           id: finalZone.id,
           city_id: resolvedCityId,
           name: finalZone.name,
           pincode: finalZone.primaryPinCode || "700001",
+          ...(centerLat !== null && { latitude: centerLat }),
+          ...(centerLon !== null && { longitude: centerLon }),
         } as any).catch((e) => console.error("Database area synchronization addition aborted:", e));
       }
 
@@ -1689,10 +1716,11 @@ export default function GeofencingManagementSystem({
                             </button>
                             <button
                               onClick={() => handleDeleteArea(area.id)}
-                              className="p-1.5 hover:bg-slate-800 text-slate-400 rounded-lg cursor-pointer"
+                              className="px-2.5 py-1.5 flex items-center gap-1.5 hover:bg-rose-500 bg-rose-500/10 text-rose-500 hover:text-white rounded-lg cursor-pointer text-[10px] font-bold transition-colors shadow-xs"
                               title="Permanent Termination"
                             >
-                              <Trash2 className="w-3.5 h-3.5 hover:text-rose-500" />
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
                             </button>
                           </div>
                         </td>

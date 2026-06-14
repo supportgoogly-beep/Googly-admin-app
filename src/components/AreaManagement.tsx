@@ -552,6 +552,7 @@ export default function AreaManagement() {
           createdDate: new Date().toISOString().split("T")[0]
         };
         localStorage.setItem("googly_geofencing_areas", JSON.stringify([...existingAreas, newAreaLocal]));
+        window.dispatchEvent(new Event("geofencing_areas_changed"));
         window.dispatchEvent(new CustomEvent("supabase_local_sync", {
           detail: { collectionName: "zones", action: "INSERT", payload: {
             id: createdAreaId,
@@ -580,6 +581,9 @@ export default function AreaManagement() {
 
   const handleDeleteArea = async (id: string) => {
     try {
+      if (selectedAreaId === id) {
+        setSelectedAreaId(null);
+      }
       await deleteItem(id);
 
       // Sync deletion to zones table
@@ -596,6 +600,7 @@ export default function AreaManagement() {
           const parsed = JSON.parse(savedAreas);
           const remainAreas = parsed.filter((a: any) => a.id !== id);
           localStorage.setItem("googly_geofencing_areas", JSON.stringify(remainAreas));
+          window.dispatchEvent(new Event("geofencing_areas_changed")); // Notify Geofencing section
         }
         window.dispatchEvent(new CustomEvent("supabase_local_sync", {
           detail: { collectionName: "zones", action: "DELETE", payload: { id } }
@@ -606,7 +611,7 @@ export default function AreaManagement() {
     }
   };
 
-  if (!cityId && globalCity !== "All Cities") {
+  if (!cityId || globalCity === "All Cities") {
     return (
       <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
         <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -919,10 +924,11 @@ export default function AreaManagement() {
                             e.stopPropagation(); // Avoid triggering selection click
                             handleDeleteArea(area.id);
                           }}
-                          className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50/10 rounded-xl transition-all cursor-pointer"
+                          className="px-3 py-1.5 flex items-center justify-center gap-1.5 text-rose-500 hover:text-white hover:bg-rose-500 bg-rose-50 rounded-lg transition-all cursor-pointer font-bold text-xs shadow-xs ml-auto"
                           title="Remove Zone"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
                         </button>
                       </td>
                     </tr>

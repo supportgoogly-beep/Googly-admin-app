@@ -7,6 +7,7 @@ import {
   Settings2, Download, Info, Eye, EyeOff, ShieldCheck, 
   ArrowLeftRight, HelpCircle, FileSpreadsheet, Sparkles
 } from "lucide-react";
+import { uploadFile } from "../lib/storage";
 
 export interface MenuItemAddon {
   id: string;
@@ -497,7 +498,7 @@ export default function MenuManagementModule({
     }
   };
 
-  const handleFileInput = (file: File) => {
+  const handleFileInput = async (file: File) => {
     // Validation size
     const limit = 10 * 1024 * 1024; // 10MB limit
     if (file.size > limit) {
@@ -516,25 +517,31 @@ export default function MenuManagementModule({
       size: (file.size / 1024 / 1024).toFixed(2) + " MB"
     });
 
-    // Start simulated progress bar
     setIsUploading(true);
     setUploadProgress(0);
+
+    // Simulated progress bar for better UX
     const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          // Set preview mock image
-          setItemForm(prevForm => ({
-            ...prevForm,
-            image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&q=80"
-          }));
-          triggerToast("Upload Cleared", "Transmitted media payload. Ready to bind.", "success");
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 250);
+      setUploadProgress(prev => (prev < 90 ? prev + 10 : prev));
+    }, 100);
+
+    const result = await uploadFile(file);
+    
+    clearInterval(interval);
+    setUploadProgress(100);
+    
+    setTimeout(() => {
+      setIsUploading(false);
+      if (result.success && result.url) {
+        setItemForm(prevForm => ({
+          ...prevForm,
+          image: result.url!
+        }));
+        triggerToast("Upload Cleared", "Transmitted media payload to S3. Ready to bind.", "success");
+      } else {
+        triggerToast("Upload Failed", result.error || "Could not bridge to storage cluster.", "error");
+      }
+    }, 200);
   };
 
   // Add add-on handle

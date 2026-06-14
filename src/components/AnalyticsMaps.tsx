@@ -365,7 +365,7 @@ export default function AnalyticsMaps({
             <span className={`text-[10px] font-black uppercase tracking-widest block ${darkMode ? "text-slate-400" : "text-gray-400"}`}>
               Quick Executive Actions
             </span>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <button
                 onClick={() => {
                   setCurrentTab("restaurants");
@@ -429,7 +429,7 @@ export default function AnalyticsMaps({
           </div>
 
           {/* Top 4 Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div 
               id="stat-card-users"
               onClick={() => {
@@ -531,10 +531,10 @@ export default function AnalyticsMaps({
           </div>
 
           {/* SALES ANALYTICS & TIME PERIOD CHANGER */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             
             {/* SALES WEEK CHART */}
-            <div className={`lg:col-span-2 p-5 rounded-2xl border transition-all ${
+            <div className={`md:col-span-2 p-5 rounded-2xl border transition-all ${
               darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"
             } space-y-4`}>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -683,10 +683,9 @@ export default function AnalyticsMaps({
             </div>
 
             {/* TODAY'S METEOROLOGICAL & TRAFFIC STATUS CARD */}
-            <div className="space-y-6">
-              <div className={`p-5 rounded-2xl border transition-all w-[322.08px] h-[235.42px] ml-[3px] mt-[1px] ${
-                darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"
-              } space-y-4`}>
+            <div className={`p-5 rounded-2xl border transition-all md:col-span-1 h-fit ${
+              darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"
+            } space-y-4`}>
                 <div className="flex justify-between items-start border-b border-gray-200/10 pb-3">
                   <div>
                     <span className="text-[9px] bg-[#E23744] font-black px-2 py-0.5 rounded text-white block uppercase tracking-widest text-center max-w-[130px]">
@@ -769,7 +768,7 @@ export default function AnalyticsMaps({
               </div>
 
               {/* SYSTEM ALERTS CARD / NOTIFICATION CENTER */}
-              <div className={`p-5 rounded-2xl border transition-all ${
+              <div className={`p-5 rounded-2xl border transition-all md:col-span-1 h-fit ${
                 darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"
               } space-y-3`}>
                 <div className="flex justify-between items-center border-b border-gray-200/10 pb-2">
@@ -822,7 +821,6 @@ export default function AnalyticsMaps({
                   </div>
                 </div>
               </div>
-            </div>
           </div>
 
           {/* BUSINESS PERFORMANCE SNAPSHOT */}

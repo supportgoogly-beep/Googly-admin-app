@@ -6,6 +6,7 @@ import {
   Share2, FileSpreadsheet, UserCheck, RefreshCw, Smartphone, Mail, AlertOctagon, 
   Volume1, Zap, Sliders, Layout, History, FileUp, Copy, Eye, HelpCircle, Save, Info
 } from "lucide-react";
+import { uploadFile } from "../lib/storage";
 
 interface SoundAsset {
   id: string;
@@ -409,7 +410,7 @@ export default function NotificationsSoundsManagement({
   };
 
   // Custom File Uploader validations
-  const processUploadedFile = (file: File) => {
+  const processUploadedFile = async (file: File) => {
     const validExtensions = ["wav", "mp3"];
     const fileExtension = file.name.split(".").pop()?.toLowerCase() || "";
     
@@ -431,18 +432,30 @@ export default function NotificationsSoundsManagement({
       ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
       : `${(file.size / 1024).toFixed(0)} KB`;
 
+    triggerToast("Syncing S3...", "Uploading custom acoustic payload to Googly Storage", "info");
+    
+    const result = await uploadFile(file);
+    
+    if (!result.success || !result.url) {
+      triggerToast("Upload Failed", result.error || "Storage cluster unreachable", "error");
+      return;
+    }
+
     // Fast HTML Audio reader to calculate real duration!
     let durationFormatted = "2.5s"; // default safe preview
     try {
-      const objUrl = URL.createObjectURL(file);
-      const audioMock = new Audio(objUrl);
-      audioMock.onloadedmetadata = () => {
-        const secs = audioMock.duration;
-        if (secs && isFinite(secs)) {
-          durationFormatted = `${secs.toFixed(1)}s`;
-        }
-        URL.revokeObjectURL(objUrl);
-      };
+      const audioMock = new Audio(result.url);
+      await new Promise((resolve) => {
+        audioMock.onloadedmetadata = () => {
+          const secs = audioMock.duration;
+          if (secs && isFinite(secs)) {
+            durationFormatted = `${secs.toFixed(1)}s`;
+          }
+          resolve(true);
+        };
+        // Timeout just in case
+        setTimeout(resolve, 2000);
+      });
     } catch (err) {}
 
     // Add object entry representing loaded media reference to custom sounds state
@@ -453,10 +466,12 @@ export default function NotificationsSoundsManagement({
       duration: durationFormatted,
       size: sizeFormatted,
       uploadDate: new Date().toISOString().split("T")[0],
-      isCustom: true
+      isCustom: true,
+      srcUrl: result.url
     };
 
     setSoundsList(prev => [...prev, customAsset]);
+    triggerToast("Asset Bridged", "Custom sound successfully stored in S3 bucket.", "success");
 
     // Update real-time logs
     const newLog: AuditLogEntry = {

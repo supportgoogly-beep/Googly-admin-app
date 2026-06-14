@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Rider, RiderStatus, Order } from "../types";
 import OSMInteractiveMap from "./OSMInteractiveMap";
+import { uploadFile } from "../lib/storage";
 import { 
   Search, Sliders, MapPin, Phone, Mail, Calendar, User, Shield, 
   MapPinOff, Navigation, RefreshCw, X, AlertCircle, CheckCircle, Trash2, 
@@ -170,6 +171,24 @@ export default function RiderManagementModule({
       severity
     };
     setActivityLogs(prev => [newLog, ...prev]);
+  };
+
+  const riderFileRef = useRef<HTMLInputElement>(null);
+  const [activeUploadField, setActiveUploadField] = useState<string | null>(null);
+
+  const handleRiderFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeUploadField) {
+      triggerToast("Uploading Document...", "Transferring encrypted payload to S3 Cluster", "info");
+      const result = await uploadFile(file);
+      if (result.success && result.url) {
+        setWizardForm(prev => ({ ...prev, [activeUploadField]: result.url }));
+        triggerToast("Asset Secured", "Document synchronized successfully.", "success");
+      } else {
+        triggerToast("Encryption Failed", result.error || "Storage cluster unreachable", "error");
+      }
+      setActiveUploadField(null);
+    }
   };
 
   const handleSaveRiderEdit = (e: React.FormEvent) => {
@@ -1643,16 +1662,16 @@ export default function RiderManagementModule({
                       <button
                         type="button"
                         onClick={() => {
-    if (wizardForm.rcBookUrl) {
-      setWizardForm({ ...wizardForm, rcBookUrl: "" });
-    } else {
-      setWizardForm({ ...wizardForm, rcBookUrl: "uploaded_rc_draft.pdf" });
-      triggerToast("Bluebook RC Attached", "Registration file bind completed.", "success");
-    }
-  }}
+                          if (wizardForm.rcBookUrl) {
+                            setWizardForm({ ...wizardForm, rcBookUrl: "" });
+                          } else {
+                            setActiveUploadField("rcBookUrl");
+                            riderFileRef.current?.click();
+                          }
+                        }}
                         className="px-3 py-1.5 bg-white border text-[11px] font-bold rounded-lg"
                       >
-                        {wizardForm.rcBookUrl ? "Delete Attached Form" : "Simulate RC Upload"}
+                        {wizardForm.rcBookUrl ? "Delete Attached Form" : "Upload RC"}
                       </button>
                     </div>
 
@@ -1661,16 +1680,16 @@ export default function RiderManagementModule({
                       <button
                         type="button"
                         onClick={() => {
-    if (wizardForm.drivingLicenseUrl) {
-      setWizardForm({ ...wizardForm, drivingLicenseUrl: "" });
-    } else {
-      setWizardForm({ ...wizardForm, drivingLicenseUrl: "uploaded_lic_draft.pdf" });
-      triggerToast("Driving License Attached", "DL file bind completed.", "success");
-    }
-  }}
+                          if (wizardForm.drivingLicenseUrl) {
+                            setWizardForm({ ...wizardForm, drivingLicenseUrl: "" });
+                          } else {
+                            setActiveUploadField("drivingLicenseUrl");
+                            riderFileRef.current?.click();
+                          }
+                        }}
                         className="px-3 py-1.5 bg-white border text-[11px] font-bold rounded-lg"
                       >
-                        {wizardForm.drivingLicenseUrl ? "Delete Attached Form" : "Simulate DL Upload"}
+                        {wizardForm.drivingLicenseUrl ? "Delete Attached Form" : "Upload DL"}
                       </button>
                     </div>
                   </div>
@@ -1714,8 +1733,8 @@ export default function RiderManagementModule({
                           if (wizardForm.aadhaarUrl) {
                             setWizardForm({ ...wizardForm, aadhaarUrl: "" });
                           } else {
-                            setWizardForm({ ...wizardForm, aadhaarUrl: "uid_attached_ok.png" });
-                            triggerToast("Aadhaar Attached", "Aadhaar file bind completed.", "success");
+                            setActiveUploadField("aadhaarUrl");
+                            riderFileRef.current?.click();
                           }
                         }}
                         className="px-3 py-1.5 bg-white border text-[11px] font-bold rounded-lg w-full text-gray-700 hover:bg-gray-50"
@@ -1732,8 +1751,8 @@ export default function RiderManagementModule({
                           if (wizardForm.panUrl) {
                             setWizardForm({ ...wizardForm, panUrl: "" });
                           } else {
-                            setWizardForm({ ...wizardForm, panUrl: "pan_attached_ok.png" });
-                            triggerToast("PAN Card Attached", "PAN file bind completed.", "success");
+                            setActiveUploadField("panUrl");
+                            riderFileRef.current?.click();
                           }
                         }}
                         className="px-3 py-1.5 bg-white border text-[11px] font-bold rounded-lg w-full text-gray-700 hover:bg-gray-50"
@@ -1750,8 +1769,8 @@ export default function RiderManagementModule({
                           if (wizardForm.selfieUrl) {
                             setWizardForm({ ...wizardForm, selfieUrl: "" });
                           } else {
-                            setWizardForm({ ...wizardForm, selfieUrl: "selfie_attached_ok.png" });
-                            triggerToast("Selfie Captured", "Selfie file bind completed.", "success");
+                            setActiveUploadField("selfieUrl");
+                            riderFileRef.current?.click();
                           }
                         }}
                         className="px-3 py-1.5 bg-white border text-[11px] font-bold rounded-lg w-full text-gray-700 hover:bg-gray-50"
@@ -1760,6 +1779,13 @@ export default function RiderManagementModule({
                       </button>
                     </div>
                   </div>
+
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    ref={riderFileRef} 
+                    onChange={handleRiderFileUpload}
+                  />
                 </div>
               )}
 

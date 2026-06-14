@@ -21,6 +21,7 @@ import {
   CheckSquare, Square, ChevronLeft, ChevronRight, Lock, Sparkles,
   Building, Landmark, Trash
 } from "lucide-react";
+import { uploadFile } from "../lib/storage";
 
 interface CoreOperationsProps {
   currentTab: string;
@@ -1305,14 +1306,21 @@ export default function CoreOperations({
                       type="file" 
                       id="global-file-upload" 
                       className="hidden" 
-                      onChange={(e) => {
+                      onChange={async (e) => {
                          const file = e.target.files?.[0];
                          if (file) {
                             // Find which field we are uploading to based on (window as any).uploadTarget
                             const target = (window as any).uploadTarget || "kycDocumentUrl";
-                            const url = URL.createObjectURL(file);
-                            setRestForm(prev => ({ ...prev, [target]: url }));
-                            triggerToast("File Added", file.name + " securely attached.", "success");
+                            
+                            triggerToast("Uploading Media...", "Transferring encrypted payload to S3 Cluster", "info");
+                            
+                            const result = await uploadFile(file);
+                            if (result.success && result.url) {
+                               setRestForm(prev => ({ ...prev, [target]: result.url }));
+                               triggerToast("File Secured", file.name + " uploaded to Googly S3 successfully.", "success");
+                            } else {
+                               triggerToast("Encryption Failed", result.error || "Storage cluster unreachable", "error");
+                            }
                          }
                       }} 
                     />

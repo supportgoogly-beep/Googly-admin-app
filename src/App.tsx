@@ -54,7 +54,7 @@ export default function App() {
 }
 
 function AppContent() {
-  const { globalCity, setGlobalCity, cities } = useCityContext();
+  const { globalCity, setGlobalCity, cities, deleteCity } = useCityContext();
   
   const deviceOriginId = useRef(Math.random().toString(36).substring(7)).current;
 
@@ -68,6 +68,7 @@ function AppContent() {
   const { data: tickets, addItem: addTicket, updateItem: updateTicket, deleteItem: deleteTicket } = useSupabaseCollection<SupportTicket>("support_tickets");
   const { data: refunds, addItem: addRefund, updateItem: updateRefund, deleteItem: deleteRefund } = useSupabaseCollection<RefundRequest>("refund_requests");
   const { data: zones, addItem: addZone, updateItem: updateZone, deleteItem: deleteZone } = useSupabaseCollection<GeofencingZone>("zones");
+  const { deleteItem: deleteArea } = useSupabaseCollection<any>("areas");
   const { data: reviews, addItem: addReview, updateItem: updateReview, deleteItem: deleteReview } = useSupabaseCollection<ReviewRating>("reviews");
   const { data: banners, addItem: addBanner, updateItem: updateBanner, deleteItem: deleteBanner } = useSupabaseCollection<CMSBanner>("cms_banners");
   const { data: staff, addItem: addStaff, updateItem: updateStaff, deleteItem: deleteStaff } = useSupabaseCollection<StaffMember>("city_staff");
@@ -216,98 +217,40 @@ function AppContent() {
   }
 
   const handleSendOTP = async (email: string) => {
+    setLoading(true);
     try {
-      const res = await fetch(getApiUrl("/api/auth/send-otp"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to transmit OTP signal.");
-      }
-      triggerToast("Signal Transmitted", "Identity verification code sent to inbox.", "info");
-    } catch (err: any) {
-      if (err.message === "Not Registered") {
-        const displayMsg = err.message;
-        triggerToast("Signal Error", displayMsg, "error");
-        throw err;
-      }
-      console.warn("API send-otp failed, checking local registry for static mode:", err);
-      
       const normEmail = email.toLowerCase().trim();
-      const localWhitelist = ["ruhandharpurkayastha@gmail.com"];
-      const isRegistered = localWhitelist.includes(normEmail) || staff.some(s => s.email?.toLowerCase().trim() === normEmail);
+      
+      // Verification: Only allow registered owners or staff to reset
+      // This enforces the "Only the user who registered can use forgot password" rule
+      const isRegistered = normEmail === "ruhandharpurkayastha@gmail.com" || staff.some(s => s.email?.toLowerCase().trim() === normEmail);
       
       if (!isRegistered) {
-        triggerToast("Signal Blocked", "This entity is not recognized in the master registry.", "error");
-        throw new Error("Not Registered");
+        throw new Error("This email is not registered in the Googly master directory.");
       }
 
-      const mockOtp = "123456";
-      localStorage.setItem(`mock_otp_${email}`, mockOtp);
-      triggerToast("Signal Transmitted (Offline Mode)", "Default code 123456 is active for offline/static verification.", "info");
+      // Use native Firebase Password Reset (works on Netlify/Static)
+      // This replaces the broken custom SMTP OTP flow
+      await resetPassword(email);
+      triggerToast("Reset Link Sent", "A secure password reset link has been dispatched to your Gmail.", "success");
+    } catch (err: any) {
+      const msg = err.message === "Not Registered" ? "Entity not recognized." : err.message;
+      triggerToast("System Blocked", msg, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
   const handleVerifyOTP = async (email: string, otp: string) => {
-    try {
-      const res = await fetch(getApiUrl("/api/auth/verify-otp"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Verification mismatch.");
-      triggerToast("Identity Verified", "Biological verification successful.", "success");
-      return true;
-    } catch (err: any) {
-      if (err.message === "Not Registered") {
-        const displayMsg = err.message;
-        triggerToast("Verification Error", displayMsg, "error");
-        throw err;
-      }
-      console.warn("API verify-otp failed, checking client mock storage:", err);
-      const mockOtp = localStorage.getItem(`mock_otp_${email}`);
-      if (mockOtp && mockOtp === otp) {
-        triggerToast("Identity Verified (Offline Mode)", "Biological verification successful in offline/static fallback.", "success");
-        return true;
-      }
-      if (otp === "123456") {
-        triggerToast("Identity Verified (Offline Mode)", "Biological verification successful in offline/static fallback.", "success");
-        return true;
-      }
-      throw new Error("Verification mismatch.");
-    }
+    // Note: With native Firebase Reset, this step is bypassed as the user resets via the link.
+    // We return true to allow the UI to advance if needed, but the link is the real fix.
+    triggerToast("Link Activated", "Please follow the instructions in your email to finalize security.", "info");
+    return true;
   }
 
   const handleResetPassword = async (email: string, newPass: string, otp: string) => {
-    try {
-      const res = await fetch(getApiUrl("/api/auth/reset-password"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, newPassword: newPass, otp })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to update security parameters.");
-      }
-      triggerToast("Parameters Finalized", "New encryption key active.", "success");
-    } catch (err: any) {
-      if (err.message === "Not Registered") {
-        const displayMsg = err.message;
-        triggerToast("Update Error", displayMsg, "error");
-        throw err;
-      }
-      console.warn("API reset-password failed, executing real-time fallback via Firebase SDK (compatible with static hosting):", err);
-      try {
-        await resetPassword(email);
-        triggerToast("Reset Link Transmitted", "An encrypted security link has been dispatched to your verified inbox. Use it to finalize parameters.", "success");
-      } catch (fbErr: any) {
-        triggerToast("Transmission Failure", fbErr.message, "error");
-        throw fbErr;
-      }
-    }
+    // This is now handled by the official Firebase security page linked in the email.
+    triggerToast("Security Update", "Please use the official Firebase reset page via the email link.", "info");
   }
 
   // --- UI Elements State ---
@@ -436,8 +379,6 @@ function AppContent() {
     });
   };
 
-  const { deleteCity } = useCityContext();
-
   const handleDeleteCityCascade = async (cityName: string, isPermanent: boolean) => {
     const adminUser = profile.name || authEmail || "Super Admin";
     const timestamp = new Date().toISOString();
@@ -479,6 +420,12 @@ function AppContent() {
       }
       for (const zone of cityZones) {
         try { await deleteZone(zone.id); } catch(e) {}
+        try {
+          await deleteArea(zone.id);
+          window.dispatchEvent(new CustomEvent("supabase_local_sync", {
+            detail: { collectionName: "areas", action: "DELETE", payload: { id: zone.id } }
+          }));
+        } catch(e) {}
       }
       try {
         const savedAreas = localStorage.getItem("googly_geofencing_areas");
@@ -660,10 +607,10 @@ function AppContent() {
         <div className="flex flex-1 overflow-hidden relative">
 
           {/* Left Sticky Sidebar navigation containing all 22 components grouped cleanly */}
-          <aside className={`w-[180px] overflow-y-auto border-r border-[#E5E7EB] bg-white fixed inset-y-0 left-0 z-50 transform lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col justify-between ${
+          <aside className={`w-[180px] overflow-y-auto border-r border-[#E5E7EB] bg-white fixed inset-y-0 left-0 z-50 transform md:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col justify-between ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}>
-            <div className="flex flex-col h-full overflow-y-auto w-[204.36px]">
+            <div className="flex flex-col h-full overflow-y-auto w-full">
               
               {/* BRAND HEADER LINE */}
               <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -673,14 +620,14 @@ function AppContent() {
                 </div>
                 <button 
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="lg:hidden p-1 text-gray-500 hover:bg-gray-100 rounded-full"
+                  className="md:hidden p-1 text-gray-500 hover:bg-gray-100 rounded-full"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* NAVIGATION ROUTING DIRECTORY */}
-              <nav className="p-3 space-y-4 flex-1 text-[11px] w-[177.6px]">
+              <nav className="p-3 space-y-4 flex-1 text-[11px] w-full">
                 
                 {/* 1. Operational Command Group */}
                 <div className="space-y-1">
@@ -926,14 +873,14 @@ function AppContent() {
           </aside>
 
           {/* Core main wrapper containing top navbar header and dynamic scrollable screen area */}
-          <div className="flex-1 lg:pl-[180px] flex flex-col min-w-0">
+          <div className="flex-1 md:pl-[180px] flex flex-col min-w-0">
             
             {/* TOP NAVIGATION HEADER BAR */}
             <header className="sticky top-0 bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 z-20 shadow-xs">
               <div className="flex items-center gap-3">
                 <button 
                   onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-                  className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg"
+                  className="md:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg"
                 >
                   <Menu className="w-5 h-5" />
                 </button>
@@ -1103,7 +1050,7 @@ function AppContent() {
             </header>
 
             {/* DYNAMIC SCROLLABLE CONTENT VIEWPORT */}
-            <main className="flex-1 p-6 overflow-y-auto max-w-[1600px] w-[1112.24px] mx-auto">
+            <main className="flex-1 p-6 overflow-y-auto max-w-[1600px] w-full mx-auto">
               {/* Load appropriate module subset matching current tab */}
               {["dashboard", "pricing", "geofence", "analytics"].includes(currentTab) && (
                 <AnalyticsMaps
@@ -1176,6 +1123,7 @@ function AppContent() {
                   taxSettings={taxSettings}
                   setTaxSettings={setTaxSettings}
                   triggerToast={triggerToast}
+                  currentUserEmail={authEmail}
                 />
               )}
 
@@ -1247,7 +1195,7 @@ function AppContent() {
           {mobileSidebarOpen && (
             <div 
               onClick={() => setMobileSidebarOpen(false)}
-              className="lg:hidden fixed inset-0 bg-black/50 z-20 backdrop-blur-xs"
+              className="md:hidden fixed inset-0 bg-black/50 z-20 backdrop-blur-xs"
             ></div>
           )}
 

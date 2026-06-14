@@ -355,6 +355,7 @@ interface RbacSettingsDashboardProps {
   addStaff?: (item: Omit<StaffMember, "id">) => Promise<any>;
   updateStaff?: (id: string, updates: Partial<StaffMember>) => Promise<void>;
   deleteStaff?: (id: string) => Promise<void>;
+  currentUserEmail?: string;
 }
 
 export default function RbacSettingsDashboard({ 
@@ -362,7 +363,8 @@ export default function RbacSettingsDashboard({
   staff: externalStaff,
   addStaff: externalAddStaff,
   updateStaff: externalUpdateStaff,
-  deleteStaff: externalDeleteStaff
+  deleteStaff: externalDeleteStaff,
+  currentUserEmail
 }: RbacSettingsDashboardProps) {
   const { cities } = useCityContext();
 
@@ -678,6 +680,14 @@ export default function RbacSettingsDashboard({
 
   // Execute Final Creation & Activation
   const handleConfirmActivation = async (statusOverride?: RbacStaff["status"]) => {
+    // Security check: Only the owner in registry can perform this
+    const ownerEmail = "ruhandharpurkayastha@gmail.com";
+    if (currentUserEmail?.toLowerCase() !== ownerEmail) {
+      triggerToast("Permission Blocked", "Your credentials do not permit modifying the master organizational registry.", "error");
+      setShowConfirmationModal(false);
+      return;
+    }
+
     setShowConfirmationModal(false);
     setShowAddStaffPanel(false);
 

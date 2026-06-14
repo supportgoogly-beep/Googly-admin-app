@@ -7,6 +7,8 @@ import {
   Compass, ArrowUpRight, TrendingUp, X, Upload, Check, 
   RotateCw, RefreshCw, Scissors, MoreVertical, AlertCircle
 } from "lucide-react";
+import { uploadFile } from "../lib/storage";
+import { useRef } from "react";
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, BarChart, Bar, Legend, Cell, LineChart, Line
@@ -284,11 +286,27 @@ export default function CmsBannerManagementSystem({
     triggerToast("Campaign Cloned", `Created replica draft: "${duplicated.title}"`, "success");
   };
 
-  // Mock upload logic
   const handleSelectMockImage = (src: string) => {
     setUploadedImageSrc(src);
-    triggerToast("Image Authenticated", "Resolution validated: 1200 x 480 px. Aspect ratio matched 2.5:1.", "success");
-    setWizardStep(1); // Stay on crop screen
+    triggerToast("Image Authenticated", "Stock asset selected successfully.", "success");
+    setWizardStep(1); 
+  };
+
+  const bannerFileRef = useRef<HTMLInputElement>(null);
+
+  const handleRealFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      triggerToast("Uploading Banner...", "Synchronizing with Googly S3 High-Availability Bucket", "info");
+      const result = await uploadFile(file);
+      if (result.success && result.url) {
+        setUploadedImageSrc(result.url);
+        triggerToast("Banner Secured", "Visual asset synchronized successfully.", "success");
+        setWizardStep(1);
+      } else {
+        triggerToast("Storage Failed", result.error || "Could not bridge to CDN network", "error");
+      }
+    }
   };
 
   const handleCreateNewBannerSubmit = () => {
@@ -1063,8 +1081,15 @@ export default function CmsBannerManagementSystem({
                       </div>
                       
                       <div className="flex justify-center gap-2 pt-1">
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          ref={bannerFileRef} 
+                          accept="image/*" 
+                          onChange={handleRealFileUpload}
+                        />
                         <button
-                          onClick={() => handleSelectMockImage(demoBannerPresents[0])}
+                          onClick={() => bannerFileRef.current?.click()}
                           className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-stone-100 text-[10px] font-bold rounded-lg cursor-pointer"
                         >
                           Browse local assets

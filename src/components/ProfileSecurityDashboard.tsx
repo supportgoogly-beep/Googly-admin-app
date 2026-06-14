@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { ProfileSecurity } from "../types";
 import { 
   User, Check, Shield, Key, Smartphone, Monitor, Clock, Lock, 
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { auth } from "../lib/firebase";
 import { updateProfile } from "firebase/auth";
+import { uploadFile } from "../lib/storage";
 
 interface ProfileSecurityDashboardProps {
   profile: ProfileSecurity;
@@ -261,6 +262,22 @@ export default function ProfileSecurityDashboard({
 
     return { grade, colorText, colorBg, scorePercent: progressPercent, numScore: scoreValue };
   }, [profile.twoFactorEnabled, sessions, recoveryEmail, recoveryPhone]);
+
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      triggerToast("Syncing S3...", "Uploading custom identity payload to Googly Storage", "info");
+      const result = await uploadFile(file);
+      if (result.success && result.url) {
+        setAvatarUrl(result.url);
+        triggerToast("Profile Image Secured", "Identity asset synchronized successfully.", "success");
+      } else {
+        triggerToast("Storage Failed", result.error || "Could not bridge to CDN network", "error");
+      }
+    }
+  };
 
   // Save General details changes
   const handleSaveGeneralInfo = async (e: React.FormEvent) => {
@@ -624,10 +641,17 @@ export default function ProfileSecurityDashboard({
                   alt="admin-avatar" 
                   className="w-16 h-16 rounded-full border-2 border-[#E23744] object-cover"
                 />
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  ref={avatarFileRef} 
+                  accept="image/*" 
+                  onChange={handleAvatarFileUpload}
+                />
                 <button 
-                  onClick={handleAvatarFile}
+                  onClick={() => avatarFileRef.current?.click()}
                   className="absolute -bottom-1 -right-1 p-1 bg-[#E23744] hover:bg-[#c12632] text-white rounded-full cursor-pointer shadow-md transition-transform duration-150 hover:scale-110"
-                  title="Cycle simulated presets or upload photo"
+                  title="Upload custom photo"
                 >
                   <Upload className="w-3.5 h-3.5" />
                 </button>
