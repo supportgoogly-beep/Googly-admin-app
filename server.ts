@@ -153,7 +153,7 @@ const transporter = nodemailer.createTransport({
 
 // Validate SMTP config on startup
 if (process.env.SMTP_HOST && process.env.SMTP_HOST.includes('@')) {
-  console.error("CRITICAL: SMTP_HOST seems to be configured incorrectly (contains '@'). Please set it to 'smtp.gmail.com' (or equivalent).");
+  console.error("CRITICAL: SMTP_HOST seems to be configured incorrectly (contains '@'). Please verify your SMTP_HOST setting.");
 }
 
 // In-memory store for OTPs (Demo only - use Redis/DB for production)

@@ -21,7 +21,7 @@ export function getSupabase(): SupabaseClient {
       console.warn("Supabase credentials missing or invalid. Check environment variables.");
       // Fallback to placeholder if not configured to prevent crashes, but warn the user
       _supabase = createClient(
-        isValidUrl(supabaseUrl) ? supabaseUrl : "https://placeholder.supabase.co",
+        isValidUrl(supabaseUrl) ? supabaseUrl : "http://localhost:54321",
         supabaseAnonKey || "placeholder"
       );
     } else {

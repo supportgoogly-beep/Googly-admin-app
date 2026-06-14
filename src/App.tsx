@@ -213,6 +213,14 @@ function AppContent() {
              }
         }
         await syncUserWithSupabase(userCredential.user, name);
+        if (userCredential.user.uid.startsWith("mock")) {
+          setIsLoggedIn(true);
+          setRawProfile(p => ({ 
+            ...p, 
+            name: userCredential.user.displayName || name, 
+            email: userCredential.user.email || authEmail 
+          }));
+        }
         triggerToast("Identity Verified", `Admin nodes active for ${name}.`, "success");
     } catch (err: any) {
         const displayMsg = err.message === "Not Registered" ? "Not Registered" : err.message;
@@ -533,6 +541,7 @@ function AppContent() {
   const handleLogout = async () => {
     try {
         await logout();
+        setIsLoggedIn(false);
     } catch (err) {
         alert("Logout failed: " + err);
     }

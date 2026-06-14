@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 
 export async function uploadFile(file: File): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    const bucketName = import.meta.env.VITE_SUPABASE_BUCKET_NAME || "photos";
+    const bucketName = import.meta.env.VITE_SUPABASE_BUCKET_NAME || import.meta.env.SUPABASE_BUCKET_NAME || "default-bucket";
     const fileExt = file.name.split('.').pop() || 'jpg';
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
     const filePath = `uploads/${fileName}`;

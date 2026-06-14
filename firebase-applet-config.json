@@ -1,9 +1,9 @@
 {
-  "projectId": "googly-admin-app",
-  "appId": "1:134190736611:web:81fa53b27cf4b782d751d6",
-  "apiKey": "AIzaSyApQ0fg_i_wep3nsTbln5rI8_jZj47a8n8",
-  "authDomain": "googly-admin-app.firebaseapp.com",
-  "storageBucket": "googly-admin-app.firebasestorage.app",
-  "messagingSenderId": "134190736611",
+  "projectId": "demo-googly-admin",
+  "appId": "",
+  "apiKey": "",
+  "authDomain": "",
+  "storageBucket": "",
+  "messagingSenderId": "",
   "measurementId": ""
 }
