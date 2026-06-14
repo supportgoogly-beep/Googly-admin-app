@@ -139,7 +139,7 @@ try {
 
 // SMTP Transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
   secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for and other ports like 587
   auth: {

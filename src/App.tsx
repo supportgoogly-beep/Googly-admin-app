@@ -121,22 +121,27 @@ function AppContent() {
 
   useEffect(() => {
     import("firebase/auth").then(({ onAuthStateChanged }) => {
-      const unsubscribe = onAuthStateChanged(auth(), async (user) => {
-        setIsLoggedIn(!!user);
-        if (user) {
-          setRawProfile(p => ({ 
-            ...p, 
-            name: user.displayName || p.name || "", 
-            email: user.email || p.email || "" 
-          }));
-          const profileData = await getUserProfileFromSupabase(user.uid);
-          if (profileData) {
-            setRawProfile(p => ({ ...p, name: profileData.name || p.name, email: profileData.email || p.email }));
+      try {
+        const unsubscribe = onAuthStateChanged(auth(), async (user) => {
+          setIsLoggedIn(!!user);
+          if (user) {
+            setRawProfile(p => ({ 
+              ...p, 
+              name: user.displayName || p.name || "", 
+              email: user.email || p.email || "" 
+            }));
+            const profileData = await getUserProfileFromSupabase(user.uid);
+            if (profileData) {
+              setRawProfile(p => ({ ...p, name: profileData.name || p.name, email: profileData.email || p.email }));
+            }
           }
-        }
+          setIsLoading(false);
+        });
+        return unsubscribe;
+      } catch (err) {
+        console.warn("Firebase Auth unavailable:", err);
         setIsLoading(false);
-      });
-      return unsubscribe;
+      }
     });
   }, []);
 
@@ -217,7 +222,7 @@ function AppContent() {
   }
 
   const handleSendOTP = async (email: string) => {
-    setLoading(true);
+    setIsLoading(true);
     try {
       const normEmail = email.toLowerCase().trim();
       
@@ -237,7 +242,7 @@ function AppContent() {
       const msg = err.message === "Not Registered" ? "Entity not recognized." : err.message;
       triggerToast("System Blocked", msg, "error");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
