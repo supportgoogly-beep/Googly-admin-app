@@ -1,8 +1,24 @@
 import React, { useState } from "react";
-import { 
-  Maximize, Minimize, ZoomIn, ZoomOut, Compass, HelpCircle,
-  Trash2, Layers, ShieldAlert, Check, RefreshCw, Eye, MapPin, 
-  MousePointer, Scissors, Move, Copy, EyeOff, Search
+import {
+  Maximize,
+  Minimize,
+  ZoomIn,
+  ZoomOut,
+  Compass,
+  HelpCircle,
+  Trash2,
+  Layers,
+  ShieldAlert,
+  Check,
+  RefreshCw,
+  Eye,
+  MapPin,
+  MousePointer,
+  Scissors,
+  Move,
+  Copy,
+  EyeOff,
+  Search,
 } from "lucide-react";
 import { MapPoint } from "../../types";
 import { AreaZoneConfig } from "./GeofencingTypes";
@@ -19,7 +35,14 @@ interface GeofencingMapWorkspaceProps {
   circleRadius: number;
   setCircleRadius: (r: number) => void;
   onSavePoints: () => void;
-  triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
+  triggerToast: (
+    title: string,
+    message: string,
+    type: "success" | "error" | "info",
+  ) => void;
+  addressCoords?: [number, number];
+  addressLabel?: string;
+  onMarkerDragEnd?: (lat: number, lon: number) => void;
 }
 
 export default function GeofencingMapWorkspace({
@@ -33,10 +56,15 @@ export default function GeofencingMapWorkspace({
   circleRadius,
   setCircleRadius,
   onSavePoints,
-  triggerToast
+  triggerToast,
+  addressCoords,
+  addressLabel,
+  onMarkerDragEnd,
 }: GeofencingMapWorkspaceProps) {
   // Map customization states
-  const [mapStyle, setMapStyle] = useState<"Satellite" | "Street" | "Dark" | "Terrain">("Street");
+  const [mapStyle, setMapStyle] = useState<
+    "Satellite" | "Street" | "Dark" | "Terrain"
+  >("Street");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchLocation, setSearchLocation] = useState("");
@@ -70,7 +98,7 @@ export default function GeofencingMapWorkspace({
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
     const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-    
+
     // Safety check bounds
     const newPoint: MapPoint = { x, y };
 
@@ -78,17 +106,26 @@ export default function GeofencingMapWorkspace({
       if (measurePoints.length >= 2) {
         setMeasurePoints([newPoint]);
       } else {
-        setMeasurePoints(prev => [...prev, newPoint]);
+        setMeasurePoints((prev) => [...prev, newPoint]);
         if (measurePoints.length === 1) {
-          const dist = (Math.sqrt(Math.pow(newPoint.x - measurePoints[0].x, 2) + Math.pow(newPoint.y - measurePoints[0].y, 2)) * 0.15).toFixed(2);
-          triggerToast("Measurement Completed", `Distance trace is approximately ${dist} km.`, "info");
+          const dist = (
+            Math.sqrt(
+              Math.pow(newPoint.x - measurePoints[0].x, 2) +
+                Math.pow(newPoint.y - measurePoints[0].y, 2),
+            ) * 0.15
+          ).toFixed(2);
+          triggerToast(
+            "Measurement Completed",
+            `Distance trace is approximately ${dist} km.`,
+            "info",
+          );
         }
       }
       return;
     }
 
     if (drawMode === "Polygon") {
-      setDraftPoints(prev => [...prev, newPoint]);
+      setDraftPoints((prev) => [...prev, newPoint]);
     } else if (drawMode === "Circle") {
       // Circle takes center point and sets default radius
       setDraftPoints([newPoint]);
@@ -103,9 +140,13 @@ export default function GeofencingMapWorkspace({
           start,
           { x: newPoint.x, y: start.y },
           newPoint,
-          { x: start.x, y: newPoint.y }
+          { x: start.x, y: newPoint.y },
         ]);
-        triggerToast("Rectangle Defined", "Click save to apply boundary limits.", "success");
+        triggerToast(
+          "Rectangle Defined",
+          "Click save to apply boundary limits.",
+          "success",
+        );
       } else {
         setDraftPoints([newPoint]);
       }
@@ -115,31 +156,42 @@ export default function GeofencingMapWorkspace({
   // Convert points coordinates list to SVG polygon string
   const getPointsSvgPath = (pts: MapPoint[]) => {
     if (pts.length === 0) return "";
-    return pts.map(p => `${p.x}%,${p.y}%`).join(" ");
+    return pts.map((p) => `${p.x}%,${p.y}%`).join(" ");
   };
 
   const handleSearchLocationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchLocation) return;
-    triggerToast("Searching OSM Location", `Searching coordinates mapping for "${searchLocation}"`, "info");
+    triggerToast(
+      "Searching OSM Location",
+      `Searching coordinates mapping for "${searchLocation}"`,
+      "info",
+    );
     // Simulate finding location by placing a temporary key center
     setSearchLocation("");
   };
 
   const handleDetectCurrentLocation = () => {
-    triggerToast("Acquiring GPS Gateway", "Latitude 22.5726° N, Longitude 88.3639° E detected.", "success");
+    triggerToast(
+      "Acquiring GPS Gateway",
+      "Latitude 22.5726° N, Longitude 88.3639° E detected.",
+      "success",
+    );
   };
 
-  const activeSelectedArea = areas.find(a => a.id === selectedAreaId);
+  const activeSelectedArea = areas.find((a) => a.id === selectedAreaId);
 
   return (
-    <div className={`relative rounded-3xl overflow-hidden border transition-all ${isFullscreen ? "fixed inset-0 z-50 bg-white" : "h-[700px] bg-white border-zinc-200"}`}>
-      
+    <div
+      className={`relative rounded-3xl overflow-hidden border transition-all ${isFullscreen ? "fixed inset-0 z-50 bg-white" : "h-[700px] bg-white border-zinc-200"}`}
+    >
       {/* -------------------- FLOATING MAP CONTROLS HEADER -------------------- */}
       <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap gap-2 items-center justify-between pointer-events-none">
-        
         {/* Search location bar */}
-        <form onSubmit={handleSearchLocationSubmit} className="flex gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-xl border border-zinc-200 pointer-events-auto shadow-sm w-64">
+        <form
+          onSubmit={handleSearchLocationSubmit}
+          className="flex gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-xl border border-zinc-200 pointer-events-auto shadow-sm w-64"
+        >
           <input
             type="text"
             placeholder="Search address or pin code..."
@@ -147,7 +199,10 @@ export default function GeofencingMapWorkspace({
             onChange={(e) => setSearchLocation(e.target.value)}
             className="bg-transparent border-none text-[10px] text-zinc-800 focus:outline-none flex-1 pl-2 font-medium placeholder-zinc-400"
           />
-          <button type="submit" className="p-1 px-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] cursor-pointer">
+          <button
+            type="submit"
+            className="p-1 px-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] cursor-pointer"
+          >
             <Search className="w-3 h-3" />
           </button>
         </form>
@@ -167,24 +222,33 @@ export default function GeofencingMapWorkspace({
             className="p-1.5 bg-white hover:bg-zinc-100 text-zinc-600 rounded cursor-pointer"
             title="Toggle Fullscreen Canvas"
           >
-            {isFullscreen ? <Minimize className="w-3 h-3" /> : <Maximize className="w-3 h-3" />}
+            {isFullscreen ? (
+              <Minimize className="w-3 h-3" />
+            ) : (
+              <Maximize className="w-3 h-3" />
+            )}
           </button>
         </div>
       </div>
 
       {/* -------------------- FLOATING DRAWING TOOLBAR (LEFT SIDE) -------------------- */}
       <div className="absolute top-14 left-3 z-10 flex flex-col gap-2 select-none">
-        
         {/* Draw tools container */}
         <div className="bg-white/95 backdrop-blur-md p-1.5 rounded-xl border border-zinc-200 flex flex-col gap-1.5 shadow-sm">
-          <div className="text-[8px] font-black uppercase tracking-widest text-zinc-400 text-center mb-0.5">TOOLS</div>
-          
+          <div className="text-[8px] font-black uppercase tracking-widest text-zinc-400 text-center mb-0.5">
+            TOOLS
+          </div>
+
           <button
             onClick={() => {
               setDrawMode("Polygon");
               setDraftPoints([]);
               setIsMeasuring(false);
-              triggerToast("Polygon Drawing Tool", "Click multiple points on map, then click Apply Boundary.", "info");
+              triggerToast(
+                "Polygon Drawing Tool",
+                "Click multiple points on map, then click Apply Boundary.",
+                "info",
+              );
             }}
             className={`p-1.5 rounded-lg flex items-center justify-center transition-all cursor-pointer ${drawMode === "Polygon" ? "bg-rose-600 text-white" : "bg-zinc-50 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"}`}
             title="Draw Custom Polygon Route Boundaries"
@@ -197,7 +261,11 @@ export default function GeofencingMapWorkspace({
               setDrawMode("Circle");
               setDraftPoints([]);
               setIsMeasuring(false);
-              triggerToast("Circular Radius Selector", "Place center node on canvas, and adjust perimeter radius.", "info");
+              triggerToast(
+                "Circular Radius Selector",
+                "Place center node on canvas, and adjust perimeter radius.",
+                "info",
+              );
             }}
             className={`p-1.5 rounded-lg flex items-center justify-center transition-all cursor-pointer ${drawMode === "Circle" ? "bg-rose-600 text-white" : "bg-zinc-50 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"}`}
             title="Draw Circular Radius Coverage"
@@ -210,7 +278,11 @@ export default function GeofencingMapWorkspace({
               setDrawMode("Rectangle");
               setDraftPoints([]);
               setIsMeasuring(false);
-              triggerToast("Rectangle Framing Tool", "Click first corner of coverage box, and click second to seal boundary.", "info");
+              triggerToast(
+                "Rectangle Framing Tool",
+                "Click first corner of coverage box, and click second to seal boundary.",
+                "info",
+              );
             }}
             className={`p-1.5 rounded-lg flex items-center justify-center transition-all cursor-pointer ${drawMode === "Rectangle" ? "bg-rose-600 text-white" : "bg-zinc-50 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"}`}
             title="Bounding Box Rectangle Selector"
@@ -225,7 +297,13 @@ export default function GeofencingMapWorkspace({
               setDrawMode("None");
               setIsMeasuring(!isMeasuring);
               setMeasurePoints([]);
-              triggerToast(isMeasuring ? "Measuring Deactivated" : "Tape Measure Tool Injected", "Click two points on the layout canvas to test approximate aerial span.", "info");
+              triggerToast(
+                isMeasuring
+                  ? "Measuring Deactivated"
+                  : "Tape Measure Tool Injected",
+                "Click two points on the layout canvas to test approximate aerial span.",
+                "info",
+              );
             }}
             className={`p-1.5 rounded-lg flex items-center justify-center transition-all cursor-pointer ${isMeasuring ? "bg-amber-600 text-white" : "bg-zinc-50 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"}`}
             title="Measure Aerial Span and Distance"
@@ -238,7 +316,11 @@ export default function GeofencingMapWorkspace({
               setDraftPoints([]);
               setMeasurePoints([]);
               setDrawMode("None");
-              triggerToast("Geofencing Layers Purged", "Clean slate loaded.", "error");
+              triggerToast(
+                "Geofencing Layers Purged",
+                "Clean slate loaded.",
+                "error",
+              );
             }}
             className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg flex items-center justify-center transition-all cursor-pointer"
             title="Clear Draft Layers"
@@ -250,34 +332,82 @@ export default function GeofencingMapWorkspace({
         {/* GIS Diagnostic Details status */}
         <div className="bg-white/95 backdrop-blur-md p-2 rounded-xl border border-zinc-200 text-[9px] text-zinc-500 space-y-1 shadow-sm w-36 font-mono">
           <div className="font-bold text-zinc-800 text-[10px] font-sans flex items-center gap-1 pb-1 border-b border-zinc-100">
-            <RefreshCw className="w-3 h-3 text-rose-500 animate-spin" /> Map Status
+            <RefreshCw className="w-3 h-3 text-rose-500 animate-spin" /> Map
+            Status
           </div>
-          <div className="pt-1">Mode: <span className="text-zinc-800 font-bold">{drawMode !== "None" ? `Draw ${drawMode}` : isMeasuring ? "Measure" : "Standby"}</span></div>
+          <div className="pt-1">
+            Mode:{" "}
+            <span className="text-zinc-800 font-bold">
+              {drawMode !== "None"
+                ? `Draw ${drawMode}`
+                : isMeasuring
+                  ? "Measure"
+                  : "Standby"}
+            </span>
+          </div>
           {draftPoints.length > 0 && (
             <>
-              <div>Nodes: <span className="text-zinc-800 font-bold">{draftPoints.length}</span></div>
-              {drawMode === "Polygon" && <div>Area: <span className="text-rose-600 font-bold">{calculateArea(draftPoints)} km²</span></div>}
-              {drawMode === "Circle" && <div>Radius: <span className="text-rose-600 font-bold">4.8 km</span></div>}
+              <div>
+                Nodes:{" "}
+                <span className="text-zinc-800 font-bold">
+                  {draftPoints.length}
+                </span>
+              </div>
+              {drawMode === "Polygon" && (
+                <div>
+                  Area:{" "}
+                  <span className="text-rose-600 font-bold">
+                    {calculateArea(draftPoints)} km²
+                  </span>
+                </div>
+              )}
+              {drawMode === "Circle" && (
+                <div>
+                  Radius:{" "}
+                  <span className="text-rose-600 font-bold">4.8 km</span>
+                </div>
+              )}
             </>
           )}
           {isMeasuring && measurePoints.length > 0 && (
-            <div>Trace: <span className="text-amber-500">{measurePoints.length}/2</span></div>
+            <div>
+              Trace:{" "}
+              <span className="text-amber-500">{measurePoints.length}/2</span>
+            </div>
           )}
         </div>
       </div>
 
       {/* -------------------- MAIN INTERACTIVE CANVAS MAP WORKSPACE -------------------- */}
-      <div className="w-full h-full relative" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "center" }}>
+      <div
+        className="w-full h-full relative"
+        style={{
+          transform: `scale(${zoomLevel / 100})`,
+          transformOrigin: "center",
+        }}
+      >
         <OSMInteractiveMap
           mode="geofence"
           zones={areas}
           activeZoneId={selectedAreaId}
+          addressCoords={addressCoords}
+          addressLabel={addressLabel || "Pincode Location"}
           onUpdateGeofenceBoundary={(points) => {
             setDraftPoints(points);
           }}
+          onMarkerDragEnd={onMarkerDragEnd}
           triggerToast={triggerToast}
-          isDarkMode={mapStyle === "Dark" || mapStyle === "Satellite" || mapStyle === "Terrain"}
+          isDarkMode={
+            mapStyle === "Dark" ||
+            mapStyle === "Satellite" ||
+            mapStyle === "Terrain"
+          }
           height="100%"
+          drawMode={drawMode}
+          circleRadius={circleRadius}
+          setCircleRadius={setCircleRadius}
+          isMeasuring={isMeasuring}
+          draftPoints={draftPoints}
         />
       </div>
 
@@ -285,16 +415,18 @@ export default function GeofencingMapWorkspace({
       <div className="absolute bottom-4 right-4 bg-slate-950/80 backdrop-blur-md p-2 rounded-2xl border border-slate-850 flex items-center gap-2 pointer-events-auto shadow-2xl z-10 select-none">
         <button
           onClick={() => {
-            setZoomLevel(prev => Math.max(50, prev - 10));
+            setZoomLevel((prev) => Math.max(50, prev - 10));
           }}
           className="p-1 px-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-white rounded-lg text-xs font-black cursor-pointer"
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
-        <span className="text-[10px] text-gray-300 font-bold font-mono px-1">{zoomLevel}%</span>
+        <span className="text-[10px] text-gray-300 font-bold font-mono px-1">
+          {zoomLevel}%
+        </span>
         <button
           onClick={() => {
-            setZoomLevel(prev => Math.min(200, prev + 10));
+            setZoomLevel((prev) => Math.min(200, prev + 10));
           }}
           className="p-1 px-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-white rounded-lg text-xs font-black cursor-pointer"
         >
@@ -307,21 +439,46 @@ export default function GeofencingMapWorkspace({
         <div className="absolute bottom-4 left-4 bg-slate-950/90 backdrop-blur-md p-3.5 rounded-2xl border border-slate-850 max-w-sm pointer-events-auto shadow-2xl space-y-2 animate-fade-in z-10 transition-all font-sans">
           <div className="flex justify-between items-center">
             <h5 className="text-[11px] font-black uppercase text-[#E11D48] tracking-widest flex items-center gap-1">
-              <Compass className="w-3.5 h-3.5 text-rose-500 animate-pulse" /> Active Coverage Overlay
+              <Compass className="w-3.5 h-3.5 text-rose-500 animate-pulse" />{" "}
+              Active Coverage Overlay
             </h5>
             <span className="px-1 py-0.2 bg-emerald-500/10 text-emerald-400 text-[8px] font-black uppercase rounded">
               {activeSelectedArea.status}
             </span>
           </div>
           <div>
-            <h5 className="text-sm font-black text-white">{activeSelectedArea.name}</h5>
-            <p className="text-[10px] text-gray-400 font-semibold italic">{activeSelectedArea.description}</p>
+            <h5 className="text-sm font-black text-white">
+              {activeSelectedArea.name}
+            </h5>
+            <p className="text-[10px] text-gray-400 font-semibold italic">
+              {activeSelectedArea.description}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono font-medium pt-1 text-gray-300 border-t border-slate-850">
-            <div>SQ KM: <span className="text-white font-black">{activeSelectedArea.coverageSqKm}</span></div>
-            <div>Min Order: <span className="text-white font-black">₹{activeSelectedArea.minOrderValue}</span></div>
-            <div>Rider Count: <span className="text-white font-black">{activeSelectedArea.ridersCount} active</span></div>
-            <div>Avg ETA: <span className="text-white font-black">{activeSelectedArea.avgDeliveryTime} mins</span></div>
+            <div>
+              SQ KM:{" "}
+              <span className="text-white font-black">
+                {activeSelectedArea.coverageSqKm}
+              </span>
+            </div>
+            <div>
+              Min Order:{" "}
+              <span className="text-white font-black">
+                ₹{activeSelectedArea.minOrderValue}
+              </span>
+            </div>
+            <div>
+              Rider Count:{" "}
+              <span className="text-white font-black">
+                {activeSelectedArea.ridersCount} active
+              </span>
+            </div>
+            <div>
+              Avg ETA:{" "}
+              <span className="text-white font-black">
+                {activeSelectedArea.avgDeliveryTime} mins
+              </span>
+            </div>
           </div>
         </div>
       )}

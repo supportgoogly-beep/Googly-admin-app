@@ -472,15 +472,15 @@ export default function RefundManagementCRM({
     <div className="space-y-6 text-left animate-fade-in font-sans leading-relaxed">
       
       {/* HEADER COMPONENT */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 bg-gradient-to-r from-red-900 to-stone-900 border border-stone-800 rounded-2xl gap-4 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl gap-4 shadow-sm">
         <div className="text-left space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-rose-900/50 border border-rose-900/30 text-rose-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-750 text-gray-700 dark:text-gray-300 rounded-md text-[10px] font-black uppercase tracking-wider">
             🛡️ Fraud Prevention Active
           </div>
-          <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+          <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             Disputes & Refund Management Central
           </h2>
-          <p className="text-xs text-stone-300">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Audit customer food claims, examine photo evidence, verify fraud patterns, and safely trigger wallet compensations.
           </p>
         </div>
@@ -493,8 +493,8 @@ export default function RefundManagementCRM({
               onClick={() => { setDateRange(range as any); setIsCustomDate(false); }}
               className={`p-1.5 px-3 rounded-lg text-[11px] font-black uppercase tracking-wide cursor-pointer transition-all ${
                 dateRange === range && !isCustomDate
-                  ? "bg-[#E23744] text-white" 
-                  : "bg-stone-800 text-stone-300 hover:bg-stone-700"
+                  ? "bg-stone-900 text-white" 
+                  : "bg-white border border-gray-250 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-stone-300"
               }`}
             >
               {range === "today" ? "Today" : range === "7days" ? "Last 7 Days" : "Last 30 Days"}
@@ -503,7 +503,9 @@ export default function RefundManagementCRM({
           <button
             onClick={() => { setIsCustomDate(true); }}
             className={`p-1.5 px-3 rounded-lg text-[11px] font-black uppercase tracking-wide cursor-pointer transition-all ${
-              isCustomDate ? "bg-[#E23744] text-white" : "bg-stone-800 text-stone-300 hover:bg-stone-700"
+              isCustomDate 
+                ? "bg-stone-900 text-white" 
+                : "bg-white border border-gray-250 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-stone-300"
             }`}
           >
             Custom Range

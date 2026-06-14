@@ -15,6 +15,12 @@ export interface Area {
   city_id: string;
   name: string;
   pincode: string;
+  state?: string;
+  country?: string;
+  district?: string;
+  latitude?: number;
+  longitude?: number;
+  full_address?: string;
   created_at?: string;
 }
 
@@ -189,6 +195,7 @@ export interface Coupon {
   endDate: string;
   applicableRestaurants: string[]; // empty fits "All"
   active: boolean;
+  city?: string;
 }
 
 export interface ChatMessage {
@@ -233,6 +240,7 @@ export interface GeofencingZone {
   ordersCount: number;
   surgeEnabled: boolean;
   surgeMultiplier: number;
+  city?: string;
 }
 
 export interface ReviewRating {
@@ -254,6 +262,7 @@ export interface CMSBanner {
   linkToRestaurantId: string;
   active: boolean;
   publishDate: string;
+  city?: string;
 }
 
 export interface LoyaltyConfig {
@@ -290,6 +299,7 @@ export interface StaffMember {
     settings: boolean;
   };
   active: boolean;
+  city?: string;
 }
 
 export interface GlobalSettings {

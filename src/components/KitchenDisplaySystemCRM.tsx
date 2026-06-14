@@ -400,15 +400,15 @@ export default function KitchenDisplaySystemCRM({
     <div className="space-y-6 text-left animate-fade-in font-sans pb-16">
       
       {/* 1. COMPACT PAGE HEADER WITH AUDITING ACTIONS */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center p-6 bg-gradient-to-r from-stone-900 via-neutral-900 to-red-950 border border-stone-900 rounded-3xl gap-4 shadow-md text-white">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl gap-4 shadow-sm text-slate-800 dark:text-slate-100">
         <div className="text-left space-y-1">
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-900/40 border border-red-800/30 text-rose-400 rounded-full text-[10px] font-black uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-755 text-gray-700 dark:text-gray-300 rounded-full text-[10px] font-black uppercase tracking-wider">
             ☕ Restaurant Operations Hub
           </div>
           <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
-            <Tv className="w-6.5 h-6.5 text-[#E23744]" /> Kitchen Display System (KDS) Settings
+            <Tv className="w-6.5 h-6.5 text-slate-950 dark:text-white" /> Kitchen Display System (KDS) Settings
           </h2>
-          <p className="text-xs text-stone-300 max-w-2xl">
+          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-2xl">
             Configure restaurant-side kitchen tablet endpoints, printer networks, auto-accept loops, spoken audio triggers, and synchronize live delivery metrics with the driver fleet.
           </p>
         </div>
@@ -418,7 +418,7 @@ export default function KitchenDisplaySystemCRM({
           <button
             id="kds-trigger-sim-btn"
             onClick={triggerSimulatedIncomingOrder}
-            className="p-2 px-3 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
+            className="p-2 px-3 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 dark:bg-slate-850 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-755 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
           >
             <Play className="w-3.5 h-3.5 fill-current" /> Fire Simulation Order
           </button>
@@ -432,7 +432,7 @@ export default function KitchenDisplaySystemCRM({
                 triggerToast("Navigated to Audit Panel", "Showing continuous logs trails", "info");
               }
             }}
-            className="p-2 px-3 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-extrabold cursor-pointer transition-all flex items-center gap-1.5"
+            className="p-2 px-3 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 dark:bg-slate-850 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-755 rounded-xl text-xs font-extrabold cursor-pointer transition-all flex items-center gap-1.5"
           >
             <Activity className="w-3.5 h-3.5" /> View Activity Logs
           </button>
@@ -440,7 +440,7 @@ export default function KitchenDisplaySystemCRM({
           <button
             id="kds-reset-defaults-btn"
             onClick={handleResetToDefault}
-            className="p-2 px-3 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
+            className="p-2 px-3 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 dark:bg-slate-850 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-755 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
           >
             <RotateCcw className="w-3.5 h-3.5" /> Reset Defaults
           </button>

@@ -198,8 +198,8 @@ async function getDataStore(): Promise<any> {
   try {
     // 1. Attempt to fetch from Firestore first for robust cloud-hosted backup
     try {
-      if (admin.apps.length > 0) {
-        const db = admin.firestore();
+      if ((admin as any).apps.length > 0) {
+        const db = (admin as any).firestore();
         const collections = [
           "restaurants", "menuItems", "riders_v3", "orders_v3", "coupons", 
           "tickets", "refunds", "zones", "reviews", "banners", "loyalty", 
@@ -242,8 +242,8 @@ async function saveDataStore(data: any) {
 
     // Sync to cloud Firestore if authenticated
     try {
-      if (admin.apps.length > 0) {
-        const db = admin.firestore();
+      if ((admin as any).apps.length > 0) {
+        const db = (admin as any).firestore();
         const collections = [
           "restaurants", "menuItems", "riders_v3", "orders_v3", "coupons", 
           "tickets", "refunds", "zones", "reviews", "banners", "loyalty", 

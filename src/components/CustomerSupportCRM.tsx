@@ -521,16 +521,16 @@ export default function CustomerSupportCRM({
       
       {/* HEADER PERFORMANCE METRICS BAR */}
       <div className={`p-4 rounded-2xl border mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-        themeMode === "dark" ? "bg-[#1B1B1F] border-gray-800" : "bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200"
+        themeMode === "dark" ? "bg-[#1B1B1F] border-gray-800" : "bg-white border-gray-200"
       }`}>
         <div className="text-left space-y-0.5">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-rose-100 text-[#E23744] text-[9px] font-black uppercase tracking-wider rounded-md">
+            <span className="px-2.5 py-0.5 bg-gray-100 dark:bg-slate-800 border border-gray-250 dark:border-slate-755 text-gray-700 dark:text-gray-300 text-[9px] font-black uppercase tracking-wider rounded-md">
               Zendesk Integration Active
             </span>
           </div>
           <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Customer Support & Live CRM</h2>
-          <p className="text-xs text-stone-500 dark:text-gray-400">Streamline ticket management, assign delegates, handle refunds, and measure agent resolution elasticity index.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Streamline ticket management, assign delegates, handle refunds, and measure agent resolution elasticity index.</p>
         </div>
 
         {/* Live CSAT Counters Widget */}

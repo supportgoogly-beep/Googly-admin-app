@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import CouponManagementModule from "./CouponManagementModule";
 import ReviewsManagementSystem from "./ReviewsManagementSystem";
 import CmsBannerManagementSystem from "./CmsBannerManagementSystem";
@@ -51,6 +51,15 @@ interface EngagementSettingsProps {
   restaurants: Restaurant[];
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
   onLogout: () => void;
+  onDeleteCity?: (cityName: string, isPermanent: boolean) => Promise<void>;
+  allRestaurants?: any[];
+  allRiders?: any[];
+  allOrders?: any[];
+  allUsers?: any[];
+  allZones?: any[];
+  allCoupons?: any[];
+  allBanners?: any[];
+  allStaff?: any[];
 }
 
 export default function EngagementSettings({
@@ -80,7 +89,16 @@ export default function EngagementSettings({
   setProfile,
   restaurants,
   triggerToast,
-  onLogout
+  onLogout,
+  onDeleteCity,
+  allRestaurants = [],
+  allRiders = [],
+  allOrders = [],
+  allUsers = [],
+  allZones = [],
+  allCoupons = [],
+  allBanners = [],
+  allStaff = []
 }: EngagementSettingsProps) {
 
   // --- Coupon State ---
@@ -95,9 +113,62 @@ export default function EngagementSettings({
     setNewCityInput("");
   };
 
+  // --- Cascade City Deletion System State ---
+  const [showDeletionModal, setShowDeletionModal] = useState(false);
+  const [cityToDelete, setCityToDelete] = useState("");
+  const [deletionConfirmText, setDeletionConfirmText] = useState("");
+  const [isPermanentDelete, setIsPermanentDelete] = useState(false);
+  const [superAdminChecked, setSuperAdminChecked] = useState(true);
+
+  // Stats calculation for city about to be deleted
+  const deletionStats = useMemo(() => {
+    if (!cityToDelete) return { restaurants: 0, riders: 0, orders: 0, zones: 0, users: 0, coupons: 0, banners: 0, staff: 0 };
+    const query = cityToDelete.toLowerCase();
+    return {
+      restaurants: allRestaurants.filter((r: any) => r.city?.toLowerCase() === query).length,
+      riders: allRiders.filter((r: any) => r.city?.toLowerCase() === query).length,
+      orders: allOrders.filter((o: any) => o.city?.toLowerCase() === query).length,
+      zones: allZones.filter((z: any) => z.city?.toLowerCase() === query).length,
+      users: allUsers.filter((u: any) => u.city?.toLowerCase() === query).length,
+      coupons: allCoupons.filter((c: any) => c.city?.toLowerCase() === query).length,
+      banners: allBanners.filter((b: any) => b.city?.toLowerCase() === query).length,
+      staff: allStaff.filter((s: any) => s.city?.toLowerCase() === query).length
+    };
+  }, [cityToDelete, allRestaurants, allRiders, allOrders, allZones, allUsers, allCoupons, allBanners, allStaff]);
+
+  const pastLogs = useMemo(() => {
+    try {
+      const logs = localStorage.getItem("googly_city_deletion_audit_logs");
+      return logs ? JSON.parse(logs) : [];
+    } catch {
+      return [];
+    }
+  }, [showDeletionModal]);
+
   const handleDeleteCity = (cityName: string) => {
-    deleteCity(cityName);
-    triggerToast("City Node Deleted", `Successfully purged "${cityName}" from regional indexes.`, "success");
+    setCityToDelete(cityName);
+    setDeletionConfirmText("");
+    setIsPermanentDelete(false);
+    setShowDeletionModal(true);
+  };
+
+  const handleConfirmDeletionCascade = () => {
+    if (!superAdminChecked) {
+      triggerToast("Permission Denied", "Only Super Administrators possess access rights to delete cities.", "error");
+      return;
+    }
+    const expectedConfirm = isPermanentDelete ? "PERMANENT CASCADE DELETE" : `SOFT DELETE ${cityToDelete.toUpperCase()}`;
+    if (deletionConfirmText.trim() !== expectedConfirm) {
+      triggerToast("Verification Failed", `Please type EXACTLY "${expectedConfirm}" to authorize deletion.`, "error");
+      return;
+    }
+    if (onDeleteCity) {
+      onDeleteCity(cityToDelete, isPermanentDelete);
+    } else {
+      deleteCity(cityToDelete);
+      triggerToast("City Node Deleted", `Purged "${cityToDelete}" from regional indexes.`, "success");
+    }
+    setShowDeletionModal(false);
   };
 
   const [showCouponModal, setShowCouponModal] = useState(false);
@@ -495,6 +566,205 @@ export default function EngagementSettings({
             triggerToast={triggerToast}
             onLogout={onLogout}
           />
+        </div>
+      )}
+
+      {/* --- CASCADE CITY DELETION & SAFE PURGING MODULE --- */}
+      {showDeletionModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl relative space-y-0 border border-gray-100 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-red-50 border-b border-red-100 p-5 flex items-center gap-3">
+              <div className="p-2.5 bg-red-100 text-red-700 rounded-xl animate-pulse">
+                <AlertOctagon className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-black text-red-900">SYSTEM RISK: Delete City Node</h3>
+                <p className="text-xs text-red-700 font-bold">Cascade cleanup operation of regional databases and services for <span className="underline font-black">{cityToDelete}</span></p>
+              </div>
+              <button 
+                onClick={() => setShowDeletionModal(false)}
+                className="p-1.5 rounded-full bg-white hover:bg-gray-100 text-gray-600 border border-gray-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1 text-xs">
+              
+              {/* Security Warning Panel */}
+              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex gap-3 text-amber-800">
+                <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="space-y-1">
+                  <span className="font-extrabold text-amber-950">System Authorization Notice:</span>
+                  <p className="text-[11px] leading-relaxed text-amber-850 font-medium">
+                    This wizard performs cross-database cascade purges of related metadata schemas. Please choose between a <span className="font-extrabold">Soft Delete</span> (which hides the regional context to safeguard records in the background) or a <span className="font-extrabold">Permanent Hard Cascade Purge</span>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Cascade Purge Statistics Dashboard */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-gray-500 font-extrabold px-1">
+                  <span>REGIONAL DATA CASCADE BOUNDARY</span>
+                  <span className="text-[10px] bg-red-50 text-red-700 px-2 py-0.5 rounded-full font-black">Region: {cityToDelete}</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2.5">
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">Restaurants</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.restaurants}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">Riders</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.riders}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">Orders</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.orders}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">Geofences</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.zones}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">Customers</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.users}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">Promo Codes</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.coupons}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">CMS Banners</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.banners}</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-gray-400 font-extrabold text-[9px] uppercase tracking-wider">City Staff</span>
+                    <span className="text-base font-black text-gray-800">{deletionStats.staff}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scope Selection Box */}
+              <div className="space-y-3 pt-1">
+                <span className="block text-gray-500 font-extrabold">DELETION LEVEL SCOPING</span>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Soft Delete */}
+                  <label className={`block p-4 border rounded-xl cursor-pointer transition-all ${!isPermanentDelete ? 'border-emerald-550 bg-emerald-50/20' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="flex items-center gap-2 mb-1.5 font-bold">
+                      <input 
+                        type="radio" 
+                        name="del_scope" 
+                        checked={!isPermanentDelete} 
+                        onChange={() => setIsPermanentDelete(false)}
+                        className="text-emerald-500 focus:ring-emerald-400 cursor-pointer"
+                      />
+                      <span className="font-extrabold text-emerald-850">Soft-Delete & Hide</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 font-semibold leading-normal">
+                      City is hidden from active operational lists. All database records, indexes, parameters, and cache remain safe. Crucial for temporary operational shutdowns.
+                    </p>
+                  </label>
+
+                  {/* Hard Delete */}
+                  <label className={`block p-4 border rounded-xl cursor-pointer transition-all ${isPermanentDelete ? 'border-red-500 bg-red-50/20' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="flex items-center gap-2 mb-1.5 font-bold">
+                      <input 
+                        type="radio" 
+                        name="del_scope" 
+                        checked={isPermanentDelete} 
+                        onChange={() => setIsPermanentDelete(true)}
+                        className="text-red-550 focus:ring-red-400 cursor-pointer"
+                      />
+                      <span className="font-extrabold text-red-950">Permanent Cascade Purge</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 font-medium leading-normal">
+                      Executes full permanent cascade deletes from live database clusters and removes all related stores. Highly destructive and entirely irreversible.
+                    </p>
+                  </label>
+                </div>
+              </div>
+
+              {/* Admin Validation Checklist */}
+              <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-xl space-y-2.5">
+                <div className="flex justify-between items-center text-gray-500 font-extrabold">
+                  <span>SUPER ADMIN SECURITY GATE</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-blue-800 select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={superAdminChecked} 
+                      onChange={(e) => setSuperAdminChecked(e.target.checked)}
+                      className="rounded-sm border-gray-300 focus:ring-blue-400 cursor-pointer" 
+                    />
+                    <span>Role Checked: Super Admin</span>
+                  </label>
+                </div>
+                
+                {/* Text input check */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-400 tracking-wide uppercase">
+                    TYPE REQUISITED AUTHORIZATION PHRASE
+                  </label>
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex items-stretch">
+                    <input 
+                      type="text" 
+                      value={deletionConfirmText}
+                      onChange={(e) => setDeletionConfirmText(e.target.value)}
+                      placeholder={isPermanentDelete ? "PERMANENT CASCADE DELETE" : `SOFT DELETE ${cityToDelete.toUpperCase()}`}
+                      className="flex-1 p-2 bg-white font-mono text-xs uppercase tracking-wider font-extrabold focus:outline-hidden text-red-700"
+                    />
+                  </div>
+                  <span className="text-[10px] block text-gray-400 leading-normal text-right font-bold font-mono">
+                    Type: <span className="font-black text-gray-750 underline">{isPermanentDelete ? "PERMANENT CASCADE DELETE" : `SOFT DELETE ${cityToDelete.toUpperCase()}`}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Audit logs of previous deletions */}
+              {pastLogs.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="block text-gray-500 font-extrabold">REGIONAL DELETION AUDIT SYSTEM LOG (PAST PURGES)</span>
+                  <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1 border border-gray-100 rounded-xl p-2 bg-gray-50/50">
+                    {pastLogs.map((log: any) => (
+                      <div key={log.id} className="text-[10px] bg-white p-2 border border-gray-200/50 rounded-lg flex justify-between items-center font-mono">
+                        <div>
+                          <p className="font-black text-gray-700">Region: <span className="text-red-700">{log.cityName}</span> ({log.type})</p>
+                          <p className="text-gray-400 text-[9px]">Pushed by {log.deletedBy} on {new Date(log.deletedAt).toLocaleTimeString()}</p>
+                        </div>
+                        <div className="text-right text-gray-400 text-[9px] font-bold">
+                          Restaurants: {log.summary?.restaurants || 0} | Riders: {log.summary?.riders || 0}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="border-t border-gray-100 p-5 flex justify-end gap-3 bg-gray-100/40">
+              <button 
+                onClick={() => setShowDeletionModal(false)}
+                className="px-4 py-2 hover:bg-gray-100 border border-gray-300 text-gray-700 rounded-lg font-bold cursor-pointer"
+              >
+                Cancel Deletion
+              </button>
+              <button 
+                onClick={handleConfirmDeletionCascade}
+                disabled={deletionConfirmText !== (isPermanentDelete ? "PERMANENT CASCADE DELETE" : `SOFT DELETE ${cityToDelete.toUpperCase()}`)}
+                className={`px-5 py-2 rounded-lg font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
+                  deletionConfirmText !== (isPermanentDelete ? "PERMANENT CASCADE DELETE" : `SOFT DELETE ${cityToDelete.toUpperCase()}`)
+                    ? 'bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed'
+                    : 'bg-[#E23744] hover:bg-red-700 text-white shadow-md'
+                }`}
+              >
+                <Trash2 className="w-4 h-4" /> Authorize & Clear
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 

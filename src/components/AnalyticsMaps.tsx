@@ -9,8 +9,10 @@ import GeofencingManagementSystem from "./GeofencingManagementSystem";
 import AnalyticsReportsDashboard from "./AnalyticsReportsDashboard";
 import { 
   Order, Restaurant, Rider, User, GeofencingZone, 
-  TrafficWeatherWidget, MapPoint 
+  TrafficWeatherWidget, MapPoint, Area as DbArea 
 } from "../types";
+import { useSupabaseCollection } from "../hooks/useSupabase";
+import { useCityContext } from "../context/CityContext";
 import { 
   ArrowUpRight, Users, DollarSign, ShoppingBag, Truck, Compass, 
   TrendingUp, Download, CloudRain, Sun, AlertTriangle, Play, Save, 
@@ -57,7 +59,62 @@ export default function AnalyticsMaps({
   triggerToast
 }: AnalyticsMapsProps) {
 
-  const setZones = (action: any) => { console.warn("Shim setZones called"); };
+  const { globalCity, cityObjects } = useCityContext();
+  const currentCityObject = cityObjects.find((c) => c.name === globalCity);
+  const cityId = currentCityObject?.id;
+
+  const { addItem: addAreaSync, deleteItem: deleteAreaSync } = useSupabaseCollection<DbArea>("areas");
+
+  const setZones = async (action: any) => {
+    let nextValue: GeofencingZone[];
+    if (typeof action === 'function') {
+      nextValue = action(zones);
+    } else {
+      nextValue = action;
+    }
+
+    // Now, synchronize these updates to Supabase!
+    // 1. Find if any zone was deleted
+    const nextIds = new Set(nextValue.map(z => z.id));
+    for (const z of zones) {
+      if (!nextIds.has(z.id)) {
+        console.log("Syncing DELETE of zone & area match:", z.id);
+        try {
+          await deleteZone(z.id);
+        } catch (e) {}
+        try {
+          await deleteAreaSync(z.id);
+        } catch (e) {}
+      }
+    }
+
+    // 2. Find if any zone was updated (Updates only! No auto-additions to prevent loading feedback loops!)
+    for (const z of nextValue) {
+      const existing = zones.find(orig => orig.id === z.id);
+      if (existing) {
+        if (
+          existing.name !== z.name ||
+          existing.active !== z.active ||
+          existing.surgeEnabled !== z.surgeEnabled ||
+          existing.surgeMultiplier !== z.surgeMultiplier ||
+          JSON.stringify(existing.polygon) !== JSON.stringify(z.polygon)
+        ) {
+          console.log("Syncing UPDATE of zone", z.id);
+          try {
+            await updateZone(z.id, {
+              name: z.name,
+              polygon: z.polygon,
+              active: z.active,
+              surgeEnabled: z.surgeEnabled,
+              surgeMultiplier: z.surgeMultiplier,
+              city: z.city || globalCity || "Kolkata",
+            });
+          } catch (e) {}
+        }
+      }
+    }
+  };
+
   const [surgeMaster, setSurgeMaster] = useState(true);
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.5);
   const [selectedSurgeZones, setSelectedSurgeZones] = useState<string[]>(["zone-2"]);
@@ -106,45 +163,54 @@ export default function AnalyticsMaps({
     return () => clearInterval(interval);
   }, []);
 
-  // Real-time generator simulating live operational flow
+  // Sync Live Activities with actual order feed rather than random generated ones
   useEffect(() => {
     if (currentTab !== "dashboard") return;
-    const items = [
-      { text: "New Order Placed: OO-507 by Preeti S. from Biryani Express (₹640)", type: "order" },
-      { text: "Order status change: OO-502 has been hand-off preparing", type: "order" },
-      { text: "Rider Status: Rohith G. is transit to Sector V", type: "rider" },
-      { text: "Payout success: ₹4,150 commission finalized via Corporate Settlement", type: "payment" },
-      { text: "New User Registration: Vikram Aditya from Salt Lake added", type: "user" },
-      { text: "Restaurant verified: 'The Daily Brew' has completed KYC registration", type: "restaurant" },
-      { text: "Alert: Delivery partner Rohit has reported high traffic near Hub Sector A", type: "system" }
-    ];
-
-    const timer = setInterval(() => {
-      const randomItem = items[Math.floor(Math.random() * items.length)];
-      setActivities(prev => [
-        {
-          id: String(Date.now()),
-          text: randomItem.text,
-          time: "Just now",
-          type: randomItem.type
-        },
-        ...prev.slice(0, 5)
-      ]);
-    }, 4500);
-
-    return () => clearInterval(timer);
-  }, [currentTab]);
+    
+    if (!orders || orders.length === 0) {
+      setActivities([]);
+      return;
+    }
+    
+    const sortedOrders = [...orders].sort((a, b) => new Date(b.orderTime).getTime() - new Date(a.orderTime).getTime());
+    const topOrders = sortedOrders.slice(0, 5);
+    
+    const events = topOrders.map(o => {
+      let text = `New Order Placed: ${o.id.substring(0, 6)} by ${o.userName} from ${o.restaurantName} (₹${o.billDetail.total})`;
+      let type: "order" | "rider" | "payment" | "user" | "restaurant" | "system" = "order";
+      
+      if (o.status === "Delivered") {
+         text = `Order Completed: ${o.id.substring(0, 6)} delivered successfully`;
+         type = "system";
+      } else if (o.status === "Cancelled") {
+         text = `Order Cancelled: ${o.id.substring(0, 6)}`;
+         type = "system";
+      } else if (o.status === "Out for Delivery" && o.riderName) {
+         text = `Rider Status: ${o.riderName} is in transit for ${o.id.substring(0, 6)}`;
+         type = "rider";
+      }
+      
+      return {
+        id: `ev-${o.id}`,
+        text,
+        time: new Date(o.orderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type
+      };
+    });
+    
+    setActivities(events);
+  }, [orders, currentTab]);
 
   // --- Calculation Helpers ---
   const totalRevenue = orders
     .filter(o => o.status === "Delivered")
-    .reduce((sum, o) => sum + o.billDetail.total, 0) + 14850; // Include baseline historic
+    .reduce((sum, o) => sum + (o.billDetail.total || 0), 0);
 
   const activeRidersCount = riders.filter(r => r.active).length;
   const activeRestaurantsCount = restaurants.filter(r => r.active).length;
 
-  // Real-time chart values: sales trends this week (Mon-Sun)
-  const salesTrend = [12800, 15400, 11200, 18900, 22400, 28100, totalRevenue];
+  // Uses just real revenue instead of hardcoded chart
+  const salesTrend = [0, 0, 0, 0, 0, 0, totalRevenue];
   const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Today"];
 
   // Click handler to drop nodes on the interactive drawing zone canvas
@@ -526,31 +592,50 @@ export default function AnalyticsMaps({
               <div className="h-64 w-full" style={{ minHeight: "256px", minWidth: 0 }}>
                 <SafeResponsiveContainer minHeight={256} minWidth={0}>
                   <AreaChart
-                    data={
-                      chartPeriod === "weekly" 
-                        ? [
-                            { name: "Mon", revenue: 12800, orders: 85 },
-                            { name: "Tue", revenue: 15400, orders: 102 },
-                            { name: "Wed", revenue: 11200, orders: 74 },
-                            { name: "Thu", revenue: 18900, orders: 126 },
-                            { name: "Fri", revenue: 22400, orders: 149 },
-                            { name: "Sat", revenue: 28100, orders: 187 },
-                            { name: "Sun", revenue: totalRevenue > 25000 ? totalRevenue : 31000, orders: orders.length + 150 }
-                          ]
-                        : chartPeriod === "monthly"
-                        ? [
-                            { name: "Week 1", revenue: 65000, orders: 450 },
-                            { name: "Week 2", revenue: 89000, orders: 590 },
-                            { name: "Week 3", revenue: 78000, orders: 520 },
-                            { name: "Week 4", revenue: 95000, orders: 630 }
-                          ]
-                        : [
-                            { name: "Q1 FY26", revenue: 280000, orders: 1850 },
-                            { name: "Q2 FY26", revenue: 340000, orders: 2250 },
-                            { name: "Q3 FY26", revenue: 310000, orders: 2050 },
-                            { name: "Q4 FY26", revenue: 420000, orders: 2800 }
-                          ]
-                    }
+                       data={(() => {
+                      if (!orders || orders.length === 0) return [];
+
+                      // Calculate real trends based on actual order data
+                      const now = new Date();
+                      
+                      if (chartPeriod === "weekly") {
+                         // Default recent 7 days
+                         const last7Days = Array.from({length: 7}, (_, i) => {
+                           const d = new Date();
+                           d.setDate(d.getDate() - (6 - i));
+                           return d;
+                         });
+
+                         return last7Days.map(date => {
+                           const dateString = date.toISOString().split('T')[0];
+                           const dayOrders = orders.filter(o => o.orderTime.startsWith(dateString));
+                           return {
+                             name: date.toLocaleDateString('en-US', { weekday: 'short' }),
+                             revenue: dayOrders.reduce((sum, o) => sum + (o.billDetail.total || 0), 0),
+                             orders: dayOrders.length
+                           };
+                         });
+                      } else if (chartPeriod === "monthly") {
+                         // Default 4 weeks for monthly view
+                         return [1, 2, 3, 4].map(weekNum => {
+                           // Approx week buckets using order slicing or time
+                           const weekOrders = orders.filter(o => {
+                             const orderDate = new Date(o.orderTime).getDate();
+                             return orderDate > (weekNum - 1) * 7 && orderDate <= weekNum * 7;
+                           });
+                           return {
+                             name: `Week ${weekNum}`,
+                             revenue: weekOrders.reduce((sum, o) => sum + (o.billDetail.total || 0), 0),
+                             orders: weekOrders.length
+                           };
+                         });
+                      } else {
+                         // Quarterly view (just summarizing all real orders roughly)
+                         return [
+                            { name: "Current Q", revenue: orders.reduce((sum, o) => sum + (o.billDetail.total || 0), 0), orders: orders.length }
+                         ];
+                      }
+                    })()}
                     margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                   >
                     <defs>
@@ -599,7 +684,7 @@ export default function AnalyticsMaps({
 
             {/* TODAY'S METEOROLOGICAL & TRAFFIC STATUS CARD */}
             <div className="space-y-6">
-              <div className={`p-5 rounded-2xl border transition-all ${
+              <div className={`p-5 rounded-2xl border transition-all w-[322.08px] h-[235.42px] ml-[3px] mt-[1px] ${
                 darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"
               } space-y-4`}>
                 <div className="flex justify-between items-start border-b border-gray-200/10 pb-3">
@@ -1016,6 +1101,11 @@ export default function AnalyticsMaps({
         <GeofencingManagementSystem
           zones={zones}
           setZones={setZones}
+          addZone={addZone}
+          updateZone={updateZone}
+          deleteZone={deleteZone}
+          addAreaSync={addAreaSync}
+          deleteAreaSync={deleteAreaSync}
           restaurants={restaurants}
           riders={riders}
           triggerToast={triggerToast}

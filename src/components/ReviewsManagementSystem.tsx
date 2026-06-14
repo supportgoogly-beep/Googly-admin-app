@@ -1121,54 +1121,54 @@ export default function ReviewsManagementSystem({
         <div className="lg:col-span-4 space-y-6">
 
           {/* AI DECISION SUGGESTIVE INSIGHT ENGINE */}
-          <div className="bg-gradient-to-br from-indigo-950 to-stone-900 text-white p-5 rounded-3xl border border-indigo-800 shadow-xl space-y-3.5">
+          <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 p-5 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-3.5">
             <div className="flex justify-between items-center">
-              <span className="text-[9px] bg-indigo-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-300" /> AI Mod Radar
+              <span className="text-[9px] bg-gray-105 border border-gray-200 dark:border-slate-75 * text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-stone-700 dark:text-yellow-400" /> AI Mod Radar
               </span>
               <span className="text-[10px] text-zinc-400 font-mono">Real-time Node: Online</span>
             </div>
 
-            <h3 className="text-sm font-black tracking-tight">AI Moderation & Sentiment Insights</h3>
-            <p className="text-[11px] text-zinc-300 leading-relaxed font-medium">
+            <h3 className="text-sm font-black tracking-tight text-slate-900 dark:text-white">AI Moderation & Sentiment Insights</h3>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
               We parsed the last 150 transaction reviews. Real-time toxic, hate, or vulgar language is locked immediately.
             </p>
 
             <div className="space-y-4 pt-2">
               {/* Sentiment level progress percentages */}
-              <div className="space-y-1.5 text-xs text-stone-300 font-bold">
+              <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-300 font-bold">
                 <div className="flex justify-between">
                   <span>Positive Sentiment</span>
-                  <span className="font-mono text-emerald-400">72%</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400">72%</span>
                 </div>
-                <div className="w-full h-1.5 bg-stone-800 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div className="h-full bg-emerald-500 transition-all" style={{ width: "72%" }} />
                 </div>
               </div>
 
-              <div className="space-y-1.5 text-xs text-stone-300 font-bold">
+              <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-300 font-bold">
                 <div className="flex justify-between">
                   <span>Neutral Feedback</span>
-                  <span className="font-mono text-amber-400">16%</span>
+                  <span className="font-mono text-amber-600 dark:text-amber-400">16%</span>
                 </div>
-                <div className="w-full h-1.5 bg-stone-800 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div className="h-full bg-amber-500 transition-all" style={{ width: "16%" }} />
                 </div>
               </div>
 
-              <div className="space-y-1.5 text-xs text-stone-300 font-bold">
+              <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-300 font-bold">
                 <div className="flex justify-between">
                   <span>Negative Alerts</span>
-                  <span className="font-mono text-red-400">12%</span>
+                  <span className="font-mono text-red-650 dark:text-red-400">12%</span>
                 </div>
-                <div className="w-full h-1.5 bg-stone-800 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div className="h-full bg-red-500 transition-all" style={{ width: "12%" }} />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white/10 p-3 rounded-2xl flex items-start gap-2 text-[10.5px] leading-relaxed select-none font-medium mt-2">
-              <AlertCircle className="w-4.5 h-4.5 text-rose-500 fill-rose-50 flex-shrink-0" />
+            <div className="bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50 text-amber-80 * dark:text-amber-300 p-3 rounded-xl flex items-start gap-2 text-[10.5px] leading-relaxed select-none font-medium mt-2">
+              <AlertCircle className="w-4.5 h-4.5 text-amber-600 flex-shrink-0" />
               <span>
                 <strong>Flag Suggestion:</strong> Review index <strong>#rev-3</strong> triggers potential spam match rating. Retain manual checks.
               </span>

@@ -347,6 +347,199 @@ function AppContent() {
     });
   }, [reviews, restaurants, globalCity]);
 
+  const filteredMenuItems = React.useMemo(() => {
+    const allowedRestIds = new Set(filteredRestaurants.map(r => r.id));
+    return menuItems.filter(m => allowedRestIds.has(m.restaurantId));
+  }, [menuItems, filteredRestaurants]);
+
+  const filteredCoupons = React.useMemo(() => {
+    return coupons.filter(c => globalCity === "All Cities" || !c.city || c.city.toLowerCase() === globalCity.toLowerCase());
+  }, [coupons, globalCity]);
+
+  const filteredBanners = React.useMemo(() => {
+    return banners.filter(b => globalCity === "All Cities" || !b.city || b.city.toLowerCase() === globalCity.toLowerCase());
+  }, [banners, globalCity]);
+
+  const filteredStaff = React.useMemo(() => {
+    return staff.filter(s => globalCity === "All Cities" || !s.city || s.city.toLowerCase() === globalCity.toLowerCase());
+  }, [staff, globalCity]);
+
+  const filteredZones = React.useMemo(() => {
+    return zones.filter(z => globalCity === "All Cities" || !z.city || z.city.toLowerCase() === globalCity.toLowerCase());
+  }, [zones, globalCity]);
+
+  // Wrapper callbacks to append active city metadata upon addition actions
+  const handleAddRestaurant = async (item: Omit<Restaurant, 'id'>) => {
+    return addRestaurant({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    });
+  };
+
+  const handleAddRider = async (item: Omit<Rider, 'id'>) => {
+    return addRider({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    });
+  };
+
+  const handleAddOrder = async (item: Omit<Order, 'id'>) => {
+    return addOrder({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    });
+  };
+
+  const handleAddUser = async (item: Omit<User, 'id'>) => {
+    return addUser({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    });
+  };
+
+  const handleAddZone = async (item: Omit<GeofencingZone, 'id'>) => {
+    return addZone({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    } as any);
+  };
+
+  const handleAddCoupon = async (item: Omit<Coupon, 'id'>) => {
+    return addCoupon({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    } as any);
+  };
+
+  const handleAddBanner = async (item: Omit<CMSBanner, 'id'>) => {
+    return addBanner({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    } as any);
+  };
+
+  const handleAddStaff = async (item: Omit<StaffMember, 'id'>) => {
+    return addStaff({
+      ...item,
+      city: globalCity !== "All Cities" ? globalCity : (item.city || "Kolkata")
+    });
+  };
+
+  const { deleteCity } = useCityContext();
+
+  const handleDeleteCityCascade = async (cityName: string, isPermanent: boolean) => {
+    const adminUser = profile.name || authEmail || "Super Admin";
+    const timestamp = new Date().toISOString();
+
+    const cityRestaurants = restaurants.filter(r => r.city?.toLowerCase() === cityName.toLowerCase());
+    const cityRiders = riders.filter(r => r.city?.toLowerCase() === cityName.toLowerCase());
+    const cityOrders = orders.filter(o => o.city?.toLowerCase() === cityName.toLowerCase());
+    const cityZones = zones.filter(z => z.city?.toLowerCase() === cityName.toLowerCase());
+    const cityUsers = users.filter(u => u.city?.toLowerCase() === cityName.toLowerCase());
+    const cityCoupons = coupons.filter(c => c.city?.toLowerCase() === cityName.toLowerCase());
+    const cityBanners = banners.filter(b => b.city?.toLowerCase() === cityName.toLowerCase());
+    const cityStaff = staff.filter(s => s.city?.toLowerCase() === cityName.toLowerCase());
+
+    const countSummary = {
+      restaurants: cityRestaurants.length,
+      riders: cityRiders.length,
+      orders: cityOrders.length,
+      zones: cityZones.length,
+      users: cityUsers.length,
+      coupons: cityCoupons.length,
+      banners: cityBanners.length,
+      staff: cityStaff.length
+    };
+
+    if (isPermanent) {
+      // PERMANENT CASCADE
+      for (const rest of cityRestaurants) {
+        const rMenus = menuItems.filter(m => m.restaurantId === rest.id);
+        for (const menu of rMenus) {
+          try { await deleteMenuItem(menu.id); } catch(e) {}
+        }
+        try { await deleteRestaurant(rest.id); } catch(e) {}
+      }
+      for (const rider of cityRiders) {
+        try { await deleteRider(rider.id); } catch(e) {}
+      }
+      for (const order of cityOrders) {
+        try { await deleteOrder(order.id); } catch(e) {}
+      }
+      for (const zone of cityZones) {
+        try { await deleteZone(zone.id); } catch(e) {}
+      }
+      try {
+        const savedAreas = localStorage.getItem("googly_geofencing_areas");
+        if (savedAreas) {
+          const parsed = JSON.parse(savedAreas);
+          const remainAreas = parsed.filter((a: any) => a.city?.toLowerCase() !== cityName.toLowerCase());
+          localStorage.setItem("googly_geofencing_areas", JSON.stringify(remainAreas));
+        }
+      } catch (e) {}
+      for (const u of cityUsers) {
+        try { await deleteUser(u.id); } catch(e) {}
+      }
+      for (const c of cityCoupons) {
+        try { await deleteCoupon(c.id); } catch(e) {}
+      }
+      for (const b of cityBanners) {
+        try { await deleteBanner(b.id); } catch(e) {}
+      }
+      for (const s of cityStaff) {
+        try { await deleteStaff(s.id); } catch(e) {}
+      }
+
+      await deleteCity(cityName);
+
+      const existingLogs = JSON.parse(localStorage.getItem("googly_city_deletion_audit_logs") || "[]");
+      const newLog = {
+        id: `audit-${Date.now()}`,
+        cityName,
+        deletedBy: adminUser,
+        deletedAt: timestamp,
+        type: "PERMANENT CASCADE DELETE",
+        summary: countSummary
+      };
+      localStorage.setItem("googly_city_deletion_audit_logs", JSON.stringify([newLog, ...existingLogs]));
+
+      triggerToast("Cascade Deletion Complete", `Permanently wiped all records related to "${cityName}".`, "success");
+    } else {
+      // SOFT DELETE
+      try {
+        const softDeletedCities = JSON.parse(localStorage.getItem("googly_soft_deleted_cities") || "[]");
+        if (!softDeletedCities.includes(cityName)) {
+          const updatedSoft = [...softDeletedCities, cityName];
+          localStorage.setItem("googly_soft_deleted_cities", JSON.stringify(updatedSoft));
+          // Force active dropdown changes if current selection is deleted
+          if (globalCity === cityName) {
+            setGlobalCity("All Cities");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      const existingLogs = JSON.parse(localStorage.getItem("googly_city_deletion_audit_logs") || "[]");
+      const newLog = {
+        id: `audit-${Date.now()}`,
+        cityName,
+        deletedBy: adminUser,
+        deletedAt: timestamp,
+        type: "SOFT DELETE (HIDDEN)",
+        summary: countSummary
+      };
+      localStorage.setItem("googly_city_deletion_audit_logs", JSON.stringify([newLog, ...existingLogs]));
+
+      triggerToast("City Soft-Deleted", `City "${cityName}" hidden from active operational views.`, "info");
+    }
+    
+    // Quick reload page to refresh context state since soft deleted is persisted
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  };
+
 
   // --- Toast Trigger helper ---
   const triggerToast = (title: string, message: string, type: Toast["type"]) => {
@@ -459,7 +652,7 @@ function AppContent() {
           <aside className={`w-[180px] overflow-y-auto border-r border-[#E5E7EB] bg-white fixed inset-y-0 left-0 z-50 transform lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col justify-between ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}>
-            <div className="flex flex-col h-full overflow-y-auto">
+            <div className="flex flex-col h-full overflow-y-auto w-[204.36px]">
               
               {/* BRAND HEADER LINE */}
               <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -476,7 +669,7 @@ function AppContent() {
               </div>
 
               {/* NAVIGATION ROUTING DIRECTORY */}
-              <nav className="p-3 space-y-4 flex-1 text-[11px]">
+              <nav className="p-3 space-y-4 flex-1 text-[11px] w-[177.6px]">
                 
                 {/* 1. Operational Command Group */}
                 <div className="space-y-1">
@@ -764,8 +957,13 @@ function AppContent() {
                      id="global-city-selector"
                      value={globalCity}
                      onChange={(e) => {
-                       setGlobalCity(e.target.value);
-                       triggerToast("Region Shifted", `Operational grid locked to ${e.target.value}.`, "info");
+                       const newCity = e.target.value;
+                       localStorage.setItem("googly_global_city", newCity);
+                       setGlobalCity(newCity);
+                       triggerToast("Region Shifted", `Operational grid locked to ${newCity}. Refreshing view...`, "success");
+                       setTimeout(() => {
+                         window.location.reload();
+                       }, 600);
                      }}
                      className="bg-gray-100 border-none font-extrabold text-[#E23744] text-xs px-2 py-1.5 rounded-lg cursor-pointer focus:ring-1 focus:ring-[#E23744]"
                    >
@@ -894,7 +1092,7 @@ function AppContent() {
             </header>
 
             {/* DYNAMIC SCROLLABLE CONTENT VIEWPORT */}
-            <main className="flex-1 p-6 overflow-y-auto max-w-[1600px] w-full mx-auto">
+            <main className="flex-1 p-6 overflow-y-auto max-w-[1600px] w-[1112.24px] mx-auto">
               {/* Load appropriate module subset matching current tab */}
               {["dashboard", "pricing", "geofence", "analytics"].includes(currentTab) && (
                 <AnalyticsMaps
@@ -904,8 +1102,8 @@ function AppContent() {
                   restaurants={filteredRestaurants}
                   riders={filteredRiders}
                   users={filteredUsers}
-                  zones={zones}
-                  addZone={addZone}
+                  zones={filteredZones}
+                  addZone={handleAddZone}
                   updateZone={updateZone}
                   deleteZone={deleteZone}
                   weatherWidget={weatherWidget}
@@ -919,22 +1117,22 @@ function AppContent() {
                   currentTab={currentTab}
                   orders={filteredOrders}
                   setOrders={setOrders}
-                  addOrder={addOrder}
+                  addOrder={handleAddOrder}
                   updateOrder={updateOrder}
                   deleteOrder={deleteOrder}
                   restaurants={filteredRestaurants}
-                  addRestaurant={addRestaurant}
+                  addRestaurant={handleAddRestaurant}
                   updateRestaurant={updateRestaurant}
                   setRestaurants={setRestaurants}
                   deleteRestaurant={deleteRestaurant}
-                  menuItems={menuItems}
+                  menuItems={filteredMenuItems}
                   addMenuItem={addMenuItem}
                   updateMenuItem={updateMenuItem}
                   setMenuItems={setMenuItems}
                   deleteMenuItem={deleteMenuItem}
                   riders={filteredRiders}
                   setRiders={setRiders}
-                  addRider={addRider}
+                  addRider={handleAddRider}
                   updateRider={updateRider}
                   deleteRider={deleteRider}
                   triggerToast={triggerToast}
@@ -944,10 +1142,10 @@ function AppContent() {
               {["users", "crm", "payouts", "refunds", "tax", "rbac"].includes(currentTab) && (
                 <FinancialCRM
                   currentTab={currentTab}
-                  users={users}
+                  users={filteredUsers}
                   updateUser={updateUser}
                   deleteUser={deleteUser}
-                  addUser={addUser}
+                  addUser={handleAddUser}
                   orders={filteredOrders}
                   tickets={filteredTickets}
                   addTicket={addTicket}
@@ -958,9 +1156,9 @@ function AppContent() {
                   addRefund={addRefund}
                   updateRefund={updateRefund}
                   deleteRefund={deleteRefund}
-                  staff={staff}
+                  staff={filteredStaff}
                   setStaff={setStaff}
-                  addStaff={addStaff}
+                  addStaff={handleAddStaff}
                   updateStaff={updateStaff}
                   deleteStaff={deleteStaff}
                   setTickets={setTickets}
@@ -973,9 +1171,9 @@ function AppContent() {
               {["coupons", "notifications", "reviews", "cms", "loyalty", "policies", "settings", "profile"].includes(currentTab) && (
                 <EngagementSettings
                   currentTab={currentTab}
-                  coupons={coupons}
+                  coupons={filteredCoupons}
                   setCoupons={setCoupons}
-                  addCoupon={addCoupon}
+                  addCoupon={handleAddCoupon}
                   updateCoupon={updateCoupon}
                   deleteCoupon={deleteCoupon}
                   reviews={filteredReviews}
@@ -983,9 +1181,9 @@ function AppContent() {
                   addReview={addReview}
                   updateReview={updateReview}
                   deleteReview={deleteReview}
-                  banners={banners}
+                  banners={filteredBanners}
                   setBanners={setBanners}
-                  addBanner={addBanner}
+                  addBanner={handleAddBanner}
                   updateBanner={updateBanner}
                   deleteBanner={deleteBanner}
                   loyalty={loyalty}
@@ -999,6 +1197,15 @@ function AppContent() {
                   restaurants={filteredRestaurants}
                   triggerToast={triggerToast}
                   onLogout={handleLogout}
+                  onDeleteCity={handleDeleteCityCascade}
+                  allRestaurants={restaurants}
+                  allRiders={riders}
+                  allOrders={orders}
+                  allUsers={users}
+                  allZones={zones}
+                  allCoupons={coupons}
+                  allBanners={banners}
+                  allStaff={staff}
                 />
               )}
 

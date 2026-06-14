@@ -391,7 +391,7 @@ CREATE TABLE public.admin_logs (
 );
 
 -- ==========================================
--- 10. ROW LEVEL SECURITY (RLS) ENABLE
+-- 10. ROW LEVEL SECURITY (RLS) ENABLE & POLICIES
 -- ==========================================
 ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.areas ENABLE ROW LEVEL SECURITY;
@@ -401,6 +401,83 @@ ALTER TABLE public.push_notifications ENABLE ROW LEVEL SECURITY;
 -- बाकी रिक्वायर्ड एडवांस्ड टेबल्स पर भी RLS ऑन करने के लिए:
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.riders ENABLE ROW LEVEL SECURITY;
+
+-- 10.1 Policies for Cities
+DROP POLICY IF EXISTS "Allow public read access to cities" ON public.cities;
+DROP POLICY IF EXISTS "Allow public insert access to cities" ON public.cities;
+DROP POLICY IF EXISTS "Allow public update access to cities" ON public.cities;
+DROP POLICY IF EXISTS "Allow public delete access to cities" ON public.cities;
+
+CREATE POLICY "Allow public read access to cities" ON public.cities FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to cities" ON public.cities FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to cities" ON public.cities FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access to cities" ON public.cities FOR DELETE USING (true);
+
+-- 10.2 Policies for Areas
+DROP POLICY IF EXISTS "Allow public read access to areas" ON public.areas;
+DROP POLICY IF EXISTS "Allow public insert access to areas" ON public.areas;
+DROP POLICY IF EXISTS "Allow public update access to areas" ON public.areas;
+DROP POLICY IF EXISTS "Allow public delete access to areas" ON public.areas;
+
+CREATE POLICY "Allow public read access to areas" ON public.areas FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to areas" ON public.areas FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to areas" ON public.areas FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access to areas" ON public.areas FOR DELETE USING (true);
+
+-- 10.3 Policies for Profiles
+DROP POLICY IF EXISTS "Allow public read access to profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow public insert access to profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow public update access to profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow public delete access to profiles" ON public.profiles;
+
+CREATE POLICY "Allow public read access to profiles" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to profiles" ON public.profiles FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to profiles" ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access to profiles" ON public.profiles FOR DELETE USING (true);
+
+-- 10.4 Policies for Orders
+DROP POLICY IF EXISTS "Allow public read access to orders" ON public.orders;
+DROP POLICY IF EXISTS "Allow public insert access to orders" ON public.orders;
+DROP POLICY IF EXISTS "Allow public update access to orders" ON public.orders;
+DROP POLICY IF EXISTS "Allow public delete access to orders" ON public.orders;
+
+CREATE POLICY "Allow public read access to orders" ON public.orders FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to orders" ON public.orders FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to orders" ON public.orders FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access to orders" ON public.orders FOR DELETE USING (true);
+
+-- 10.5 Policies for Push Notifications
+DROP POLICY IF EXISTS "Allow public read access to push_notifications" ON public.push_notifications;
+DROP POLICY IF EXISTS "Allow public insert access to push_notifications" ON public.push_notifications;
+DROP POLICY IF EXISTS "Allow public update access to push_notifications" ON public.push_notifications;
+DROP POLICY IF EXISTS "Allow public delete access to push_notifications" ON public.push_notifications;
+
+CREATE POLICY "Allow public read access to push_notifications" ON public.push_notifications FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to push_notifications" ON public.push_notifications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to push_notifications" ON public.push_notifications FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access to push_notifications" ON public.push_notifications FOR DELETE USING (true);
+
+-- 10.6 Policies for Restaurants
+DROP POLICY IF EXISTS "Allow public read access to restaurants" ON public.restaurants;
+DROP POLICY IF EXISTS "Allow public insert access to restaurants" ON public.restaurants;
+DROP POLICY IF EXISTS "Allow public update access to restaurants" ON public.restaurants;
+DROP POLICY IF EXISTS "Allow public delete access to restaurants" ON public.restaurants;
+
+CREATE POLICY "Allow public read access to restaurants" ON public.restaurants FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to restaurants" ON public.restaurants FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to restaurants" ON public.restaurants FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access to restaurants" ON public.restaurants FOR DELETE USING (true);
+
+-- 10.7 Policies for Riders
+DROP POLICY IF EXISTS "Allow public read access to riders" ON public.riders;
+DROP POLICY IF EXISTS "Allow public insert access to riders" ON public.riders;
+DROP POLICY IF EXISTS "Allow public update access to riders" ON public.riders;
+DROP POLICY IF EXISTS "Allow public delete access to riders" ON public.riders;
+
+CREATE POLICY "Allow public read access to riders" ON public.riders FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to riders" ON public.riders FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to riders" ON public.riders FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete access to riders" ON public.riders FOR DELETE USING (true);
 
 -- ==========================================
 -- 11. ENABLE SUPABASE REAL-TIME REPLICATION

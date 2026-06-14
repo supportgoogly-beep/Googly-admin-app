@@ -873,13 +873,13 @@ export default function PayoutsManagementCRM({ triggerToast }: PayoutsManagement
       </div>
 
       {/* 5. BATCH SETTLEMENT & MASS DISBURSAL CONTROL PANEL */}
-      <div className="p-5 bg-gradient-to-r from-red-50 to-[#E23744]/5 border border-[#E23744]/25 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left">
+      <div className="p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left">
         <div>
-          <span className="px-2 py-0.5 bg-[#E23744] text-white rounded text-[9.5px] font-black uppercase inline-block mb-1">
+          <span className="px-2.5 py-0.5 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-750 text-gray-700 dark:text-gray-300 rounded text-[9.5px] font-black uppercase inline-block mb-1">
             Settlement Workspace Controller
           </span>
-          <h3 className="text-base font-black text-stone-900 tracking-tight">Consolidated Batch Payments Settlement</h3>
-          <p className="text-xs text-stone-500 max-w-2xl">
+          <h3 className="text-base font-black text-stone-900 dark:text-white tracking-tight">Consolidated Batch Payments Settlement</h3>
+          <p className="text-xs text-stone-500 dark:text-stone-400 max-w-2xl">
             Settle out all outstanding balances simultaneously. This initiates real-time IMPS bank server transactions and generates individual GST invoices for partner compliance accounts.
           </p>
         </div>
@@ -888,21 +888,21 @@ export default function PayoutsManagementCRM({ triggerToast }: PayoutsManagement
           <button
             id="settle-all-restaurants-btn"
             onClick={() => handleOpenSettleModal("Restaurants")}
-            className="p-2 px-3.5 bg-slate-900 text-white rounded-xl text-xs font-black shadow-xs hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 px-3.5 bg-slate-900 text-white rounded-xl text-xs font-black shadow-xs hover:bg-slate-800 transition-colors cursor-pointer border border-transparent"
           >
             Settle Restaurant Batch
           </button>
           <button
             id="settle-all-riders-btn"
             onClick={() => handleOpenSettleModal("Riders")}
-            className="p-2 px-3.5 bg-slate-900 text-white rounded-xl text-xs font-black shadow-xs hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 px-3.5 bg-slate-900 text-white rounded-xl text-xs font-black shadow-xs hover:bg-slate-800 transition-colors cursor-pointer border border-transparent"
           >
             Settle Rider Batch
           </button>
           <button
             id="settle-all-pending-btn"
             onClick={() => handleOpenSettleModal("All Pending")}
-            className="p-2 px-4.5 bg-[#E23744] text-white rounded-xl text-xs font-black shadow-sm hover:bg-red-700 transition-colors cursor-pointer"
+            className="p-2 px-4.5 bg-neutral-950 text-white rounded-xl text-xs font-black shadow-sm hover:bg-black transition-colors cursor-pointer border border-transparent"
           >
             Settle All Pending Dues
           </button>

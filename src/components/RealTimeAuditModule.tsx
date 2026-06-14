@@ -407,19 +407,19 @@ The replication pipeline conforms completely to the strict **Universal Synchroni
   return (
     <div className="space-y-6">
       {/* HEADER BANNER */}
-      <div className="bg-gradient-to-r from-gray-950 via-slate-900 to-gray-900 p-6 rounded-2xl border border-gray-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 text-slate-800 dark:text-slate-100">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="flex h-2.5 w-2.5 relative">
+            <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-[10px] font-black text-emerald-400 tracking-widest uppercase">System Automation Core</span>
+            <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 tracking-widest uppercase">System Automation Core</span>
           </div>
-          <h1 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            <Database className="w-6 h-6 text-[#E23744]" /> Enterprise Real-Time & Replication Verification Suite
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            <Database className="w-6 h-6 text-slate-950 dark:text-white" /> Enterprise Real-Time & Replication Verification Suite
           </h1>
-          <p className="text-xs text-gray-400 max-w-2xl font-semibold">
+          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-2xl font-semibold">
             Actively auditing transaction logs, sub-millisecond database propagation latencies, role-based permission hot-reloads, and cross-device binary synchronization.
           </p>
         </div>
@@ -427,15 +427,15 @@ The replication pipeline conforms completely to the strict **Universal Synchroni
         <button
           onClick={runE2EAudit}
           disabled={isRunningTest}
-          className={`px-5 py-3 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-lg ${
+          className={`px-5 py-3 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-xs border border-transparent ${
             isRunningTest
-              ? "bg-gray-800 text-gray-500 cursor-not-allowed scale-98"
-              : "bg-[#E23744] hover:bg-[#c92f3b] text-white hover:shadow-[#e237441a]"
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed scale-98"
+              : "bg-slate-900 hover:bg-slate-800 text-white"
           }`}
         >
           {isRunningTest ? (
             <>
-              <RefreshCw className="w-4 h-4 animate-spin text-gray-500" /> Auditing Core Engine...
+              <RefreshCw className="w-4 h-4 animate-spin text-gray-450" /> Auditing Core Engine...
             </>
           ) : (
             <>

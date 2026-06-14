@@ -133,16 +133,14 @@ export default function AnalyticsReportsDashboard({
   });
   const [showPersonalizerModal, setShowPersonalizerModal] = useState(false);
 
-  // --- Auto-Refresh System Ticker ---
+  // --- Auto-Refresh System Ticker & Live Feed Builder ---
   useEffect(() => {
     let interval: any = null;
     if (autoRefresh) {
       interval = setInterval(() => {
         setRefreshCountdown(prev => {
           if (prev <= 1) {
-            // Trigger auto simulation of incoming data
             setLastRefreshedAt(new Date().toLocaleTimeString());
-            simulateIncomingData();
             return 30; // reset countdown to 30s
           }
           return prev - 1;
@@ -152,37 +150,48 @@ export default function AnalyticsReportsDashboard({
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  // Simulate real-time stream incoming
-  const simulateIncomingData = () => {
-    const randomDescriptions = [
-      `New order OO-${Math.floor(Math.random() * 100) + 515} received from Imperial Biryani Hub (₹680)`,
-      `Rider ${riders[Math.floor(Math.random() * riders.length)]?.name || "Rohan G"} logged online near Salt Lake Sector 5`,
-      `Order status update: OO-${Math.floor(Math.random() * 50) + 400} was successfully delivered in 14 minutes.`,
-      `Promo code 'RAINY25' was redeemed on order by customer Sneha K.`,
-      `Customer refund request CR-${Math.floor(Math.random() * 50) + 120} instantly auto-settled by refund algorithm.`
-    ];
-    const badges = ["New Order", "Shift Update", "Delivery Complete", "Coupon Usage", "Dispute Resolution"];
-    const colors = ["bg-[#E23744]", "bg-indigo-500", "bg-emerald-500", "bg-purple-500", "bg-orange-500"];
-    const chosenIndex = Math.floor(Math.random() * randomDescriptions.length);
-
-    setLiveEvents(prev => [
-      {
-        id: `ev-${Date.now()}`,
-        time: new Date().toLocaleTimeString(),
-        description: randomDescriptions[chosenIndex],
-        badge: badges[chosenIndex],
-        badgeColor: colors[chosenIndex]
-      },
-      ...prev.slice(0, 4)
-    ]);
-    triggerToast("Metrics Sync", "Real-time stream updated from centralized delivery node.", "success");
-  };
+  // Sync Live Events with actual orders
+  useEffect(() => {
+    if (!orders || orders.length === 0) {
+      setLiveEvents([]);
+      return;
+    }
+    
+    // Convert the most recent orders into feed events
+    const sortedOrders = [...orders].sort((a, b) => new Date(b.orderTime).getTime() - new Date(a.orderTime).getTime());
+    const topOrders = sortedOrders.slice(0, 5);
+    
+    const events = topOrders.map(o => {
+      let badge = "New Order";
+      let badgeColor = "bg-[#E23744]";
+      
+      if (o.status === "Delivered") {
+        badge = "Delivery Complete";
+        badgeColor = "bg-emerald-500";
+      } else if (o.status === "Cancelled") {
+        badge = "Cancelled";
+        badgeColor = "bg-red-600";
+      } else if (o.status === "Out for Delivery") {
+        badge = "Transit Started";
+        badgeColor = "bg-blue-500";
+      }
+      
+      return {
+        id: `ev-real-${o.id}`,
+        time: new Date(o.orderTime).toLocaleTimeString(),
+        description: `Order ${o.id.substring(0,6)}... from ${o.restaurantName} (₹${o.billDetail.total})`,
+        badge,
+        badgeColor
+      };
+    });
+    
+    setLiveEvents(events);
+  }, [orders]);
 
   // Manual refresh hook
   const handleManualRefresh = () => {
     setLastRefreshedAt(new Date().toLocaleTimeString());
     setRefreshCountdown(30);
-    simulateIncomingData();
     triggerToast("Dashboard Refreshed", "Centralized data cube aggregated manually successfully.", "info");
   };
 
@@ -227,43 +236,39 @@ export default function AnalyticsReportsDashboard({
   };
 
   // --- DATA FILTER CLASSIFIER / CALCULATOR ENGINE ---
-  // Let us build stable mock data grids matching the current date range & city/restaurant filters
+  // Using actual data for realistic metrics instead of multipliers
   const filteredMetrics = useMemo(() => {
-    let multiplier = 1.0;
+    let relevantOrders = orders;
     
-    // Simulating variations based on date range
-    if (selectedDateRange === "Today") multiplier = 0.14;
-    else if (selectedDateRange === "Yesterday") multiplier = 0.15;
-    else if (selectedDateRange === "Last 7 Days") multiplier = 0.58;
-    else if (selectedDateRange === "This Month") multiplier = 1.0;
-    else if (selectedDateRange === "Last Month") multiplier = 0.94;
-    else if (selectedDateRange === "Last 30 Days") multiplier = 1.02;
+    // Apply filters matching the global dashboard settings
+    if (selectedCity !== "All") relevantOrders = relevantOrders.filter(o => o.city === selectedCity);
+    if (selectedRestaurant !== "All") relevantOrders = relevantOrders.filter(o => o.restaurantName === selectedRestaurant);
+    if (selectedStatus !== "All") relevantOrders = relevantOrders.filter(o => o.status === selectedStatus);
+    if (selectedRider !== "All") relevantOrders = relevantOrders.filter(o => o.riderName === selectedRider);
+    // (Note: dates and zones can be added to filtering logic based on actual real-time parsing bounds)
+    
+    const calcOrders = relevantOrders.length;
+    let grossVal = 0;
+    
+    relevantOrders.forEach(o => {
+      grossVal += o.billDetail.total || 0;
+    });
 
-    // Filter adjustments for selected filters
-    if (selectedCity !== "All") multiplier *= 0.45;
-    if (selectedZone !== "All") multiplier *= 0.3;
-    if (selectedRestaurant !== "All") multiplier *= 0.15;
-    if (selectedRider !== "All") multiplier *= 0.1;
-
-    // Baseline database statistics
-    const baseRevenue = 294850;
-    const baseOrdersCount = 948;
-    const baseCustomersCount = 1250;
-    const baseRidersCount = riders.length > 0 ? riders.length : 35;
-    const baseRestaurantsCount = restaurants.length > 0 ? restaurants.length : 18;
-
-    const calcRevenue = Math.round(baseRevenue * multiplier);
-    const calcOrders = Math.round(baseOrdersCount * multiplier);
-    const calcCustomers = Math.round(baseCustomersCount * multiplier);
-    const calcRiders = selectedRider === "All" ? Math.max(5, Math.round(baseRidersCount * (selectedCity === "All" ? 1 : 0.4))) : 1;
-    const calcRestaurants = selectedRestaurant === "All" ? Math.max(3, Math.round(baseRestaurantsCount * (selectedCity === "All" ? 1 : 0.4))) : 1;
-
-    // Revenue breakdown details
-    const grossVal = calcRevenue;
     const commissionVal = Math.round(grossVal * 0.18);
-    const deliveryFeeVal = Math.round(calcOrders * 35);
-    const taxVal = Math.round(grossVal * 0.05);
+    const taxVal = Math.round(grossVal * 0.05); // Simulated tax rate
+    const deliveryFeeVal = relevantOrders.reduce((sum, o) => sum + (o.billDetail.delivery || 0), 0);
     const netVal = grossVal - commissionVal - taxVal;
+    
+    // Base counts using filter matching correctly 
+    const calcRestaurants = selectedRestaurant === "All" 
+        ? new Set(relevantOrders.map(o => o.restaurantId)).size 
+        : 1;
+        
+    const calcRiders = selectedRider === "All"
+        ? new Set(relevantOrders.filter(o => o.riderId).map(o => o.riderId)).size
+        : 1;
+        
+    const calcCustomers = new Set(relevantOrders.map(o => o.userId)).size;
 
     return {
       totalRevenue: grossVal,
@@ -275,11 +280,13 @@ export default function AnalyticsReportsDashboard({
       activeCustomers: calcCustomers,
       activeRestaurants: calcRestaurants,
       activeRiders: calcRiders,
-      avgOrderValue: calcOrders > 0 ? Math.round(grossVal / calcOrders) : 310,
-      deliverySuccessRate: selectedStatus === "Cancelled" ? 0 : 98.4,
-      satisfactionScore: 4.8
+      avgOrderValue: calcOrders > 0 ? Math.round(grossVal / calcOrders) : 0,
+      deliverySuccessRate: calcOrders > 0 
+        ? Math.round((relevantOrders.filter(o => o.status === "Delivered").length / calcOrders) * 100) 
+        : 0,
+      satisfactionScore: 0 // Mock placeholder removed; assuming real rating aggregate implementation if possible
     };
-  }, [selectedDateRange, selectedCity, selectedZone, selectedRestaurant, selectedRider, selectedStatus]);
+  }, [orders, selectedDateRange, selectedCity, selectedZone, selectedRestaurant, selectedRider, selectedStatus]);
 
   // Export CSV Action Simulator
   const handleExportCSV = () => {
