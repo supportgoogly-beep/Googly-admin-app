@@ -164,9 +164,19 @@ CREATE TABLE public.rider_locations (
 -- 5. CITY-WISE STAFF & ROLE ACCESS CONTROL (RBAC)
 -- ==========================================
 CREATE TABLE public.city_staff (
-  id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
-  city_id UUID NOT NULL REFERENCES public.cities(id) ON DELETE CASCADE, -- सिटी वाइज एंप्लॉयी
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  city_id UUID NOT NULL REFERENCES public.cities(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL,
   designation TEXT NOT NULL, -- 'City Manager', 'Support Staff', 'Sub-Admin'
+  active BOOLEAN DEFAULT TRUE,
+  phone TEXT,
+  department TEXT,
+  avatar TEXT,
+  employee_id TEXT,
+  security JSONB DEFAULT '{}'::jsonb,
+  permissions_override JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

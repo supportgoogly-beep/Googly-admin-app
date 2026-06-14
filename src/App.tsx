@@ -233,7 +233,17 @@ function AppContent() {
         triggerToast("Signal Error", displayMsg, "error");
         throw err;
       }
-      console.warn("API send-otp failed, mock forwarding for client/static mode:", err);
+      console.warn("API send-otp failed, checking local registry for static mode:", err);
+      
+      const normEmail = email.toLowerCase().trim();
+      const localWhitelist = ["ruhandharpurkayastha@gmail.com"];
+      const isRegistered = localWhitelist.includes(normEmail) || staff.some(s => s.email?.toLowerCase().trim() === normEmail);
+      
+      if (!isRegistered) {
+        triggerToast("Signal Blocked", "This entity is not recognized in the master registry.", "error");
+        throw new Error("Not Registered");
+      }
+
       const mockOtp = "123456";
       localStorage.setItem(`mock_otp_${email}`, mockOtp);
       triggerToast("Signal Transmitted (Offline Mode)", "Default code 123456 is active for offline/static verification.", "info");

@@ -173,7 +173,19 @@ export default function FinancialCRM({
       active: true
     };
 
-    setStaff(prev => [...prev, cleanStaff]);
+    // Trigger persistence via prop if available
+    if (addStaff) {
+      addStaff({
+        name: cleanStaff.name,
+        email: cleanStaff.email,
+        role: cleanStaff.role,
+        permissions: cleanStaff.permissions,
+        active: cleanStaff.active
+      });
+    } else {
+      setStaff(prev => [...prev, cleanStaff]);
+    }
+    
     setShowAddStaffModal(false);
     setNewStaffForm({ name: "", email: "", role: "Sub-Admin" });
     triggerToast("Staff Member Appointed", `${cleanStaff.name} has been given role credentials!`, "success");

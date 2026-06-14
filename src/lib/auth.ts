@@ -35,11 +35,12 @@ export const syncUserWithSupabase = async (user: User, fullName?: string) => {
   }
 
   const { data, error } = await supabase
-    .from('users')
+    .from('profiles')
     .upsert({
       id: user.uid,
       email: user.email,
       name: fullName || user.displayName || user.email?.split('@')[0],
+      role: 'staff', // Default newly synced users to staff for this admin portal context
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' })
     .select();
@@ -64,7 +65,7 @@ export const getUserProfileFromSupabase = async (uid: string) => {
   }
 
   const { data, error } = await supabase
-    .from('users')
+    .from('profiles')
     .select('*')
     .eq('id', uid)
     .single();

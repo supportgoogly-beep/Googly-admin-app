@@ -70,22 +70,27 @@ async function isEmailAuthorized(email: string): Promise<boolean> {
   if (!email) return false;
   const normEmail = email.toLowerCase().trim();
 
+  // 0. Build-in override for developer/owner
+  if (normEmail === "ruhandharpurkayastha@gmail.com") {
+    return true;
+  }
+
   // 1. Check local file-based database for immediate standalone and preview durability
   const localList = await getLocalWhitelist();
   if (localList.includes(normEmail)) {
     return true;
   }
 
-  // 2. Check Supabase 'authorized_admins' and 'city_staff' tables if configured
+  // 2. Check Supabase 'profiles' and 'city_staff' tables if configured
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      // Check authorized_admins
-      const { data: adminData } = await supabase
-        .from("authorized_admins")
+      // Check profiles
+      const { data: profileData } = await supabase
+        .from("profiles")
         .select("email")
         .eq("email", normEmail);
-      if (adminData && adminData.length > 0) {
+      if (profileData && profileData.length > 0) {
         return true;
       }
 
@@ -569,11 +574,13 @@ async function startServer() {
     otpStore.set(email, { otp, timestamp: Date.now() });
     
     try {
-        console.log(`[AUTH] Reading email template from: ${path.join(process.cwd(), 'src', 'templates', 'otp-email.html')}`);
-        const template = await fs.readFile(path.join(process.cwd(), 'src', 'templates', 'otp-email.html'), 'utf-8');
-        console.log(`[AUTH] Template read successfully. Length: ${template.length}`);
+        const template = await fs.readFile(path.join(process.cwd(), 'src', 'templates', 'otp-email.html'), 'utf-8').catch(() => "Your verification code is: {OTP_CODE}");
         const html = template.replace('{OTP_CODE}', otp);
-        console.log(`[AUTH] OTP_CODE replaced. OTP: ${otp}`);
+
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+          console.warn(`[AUTH] SMTP NOT CONFIGURED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
+          return res.json({ message: "Code transmitted (Mock mode - Check server logs)" });
+        }
 
         await transporter.sendMail({
             from: '"Googly Admin" <no-reply@googly-app.com>',
@@ -586,7 +593,9 @@ async function startServer() {
         res.json({ message: "OTP transmitted successfully." });
     } catch (err: any) {
         console.error("Email delivery failed:", err);
-        res.status(500).json({ error: "Failed to send OTP email." });
+        // Fallback for previewing without SMTP
+        console.warn(`[AUTH] SMTP FAILED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
+        res.json({ message: "Code transmitted (Fallback Mode - Check server logs)" });
     }
   });
 

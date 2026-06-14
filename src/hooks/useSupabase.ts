@@ -19,7 +19,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
   riders: ["id", "city_id", "vehicle_number", "vehicle_type", "current_status", "wallet_balance", "is_verified", "created_at"],
   rider_documents: ["rider_id", "driving_license_no", "dl_image_url", "aadhaar_number", "aadhaar_front_url", "aadhaar_back_url", "pan_number", "pan_card_url", "updated_at"],
   rider_locations: ["rider_id", "location", "latitude", "longitude", "updated_at"],
-  city_staff: ["id", "city_id", "designation", "created_at"],
+  city_staff: ["id", "city_id", "designation", "name", "email", "role", "active", "phone", "department", "avatar", "employee_id", "security", "permissions_override", "created_at"],
   staff_permissions: ["staff_id", "module_name", "can_view", "can_edit", "can_delete"],
   surge_settings: ["id", "is_surge_enabled", "surge_multiplier", "updated_at"],
   surge_zones: ["id", "zone_id"],
