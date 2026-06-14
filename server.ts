@@ -635,7 +635,7 @@ async function startServer() {
 
         if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
           console.warn(`[AUTH] SMTP NOT CONFIGURED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
-          return res.json({ message: "Code transmitted (Mock mode - Check server logs)" });
+          return res.json({ message: "Code transmitted (Mock mode - Check server logs)", otp });
         }
 
         await transporter.sendMail({
@@ -651,7 +651,7 @@ async function startServer() {
         console.error("Email delivery failed:", err);
         // Fallback for previewing without SMTP
         console.warn(`[AUTH] SMTP FAILED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
-        res.json({ message: "Code transmitted (Fallback Mode - Check server logs)" });
+        res.json({ message: "Code transmitted (Fallback Mode - Check server logs)", otp });
     }
   });
 

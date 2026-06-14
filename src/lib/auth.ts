@@ -26,14 +26,22 @@ export const login = async (email: string, pass: string) => {
     if (pass !== "admin123" && email !== "ruhandharpurkayastha@gmail.com") {
       throw new Error("auth/user-not-found");
     }
-    return { user: { uid: "mock-uuid-0000-0000-0000-000000000000", email, displayName: "Offline Admin" } as unknown as User };
+    const mockUser = { uid: "mock-uuid-0000-0000-0000-000000000000", email, displayName: "Offline Admin" } as unknown as User;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mock_firebase_user", JSON.stringify(mockUser));
+    }
+    return { user: mockUser };
   }
   return signInWithEmailAndPassword(auth(), email, pass);
 };
 
 export const register = async (email: string, pass: string, fullName: string) => {
   if (!isFirebaseAuthAvailable()) {
-    return { user: { uid: "mock-uuid-0000-0000-0000-000000000000", email, displayName: fullName } as unknown as User };
+    const mockUser = { uid: "mock-uuid-0000-0000-0000-000000000000", email, displayName: fullName } as unknown as User;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mock_firebase_user", JSON.stringify(mockUser));
+    }
+    return { user: mockUser };
   }
   const userCred = await createUserWithEmailAndPassword(auth(), email, pass);
   await updateProfile(userCred.user, { displayName: fullName });
@@ -42,6 +50,9 @@ export const register = async (email: string, pass: string, fullName: string) =>
 
 export const logout = async () => {
   if (!isFirebaseAuthAvailable()) {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("mock_firebase_user");
+    }
     return;
   }
   return signOut(auth());

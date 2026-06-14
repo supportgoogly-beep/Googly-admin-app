@@ -142,10 +142,14 @@ export default function RealTimeAuditModule({
     // Verify Firebase status safely
     try {
       import("../lib/firebase").then(({ auth }) => {
-        if (auth()) {
-          setFAuthStatus("operational");
-          addLog("SYSTEM", "Firebase Authentication Local Listener Linked.");
-        } else {
+        try {
+          if (auth()) {
+            setFAuthStatus("operational");
+            addLog("SYSTEM", "Firebase Authentication Local Listener Linked.");
+          } else {
+            setFAuthStatus("bypassed");
+          }
+        } catch (err) {
           setFAuthStatus("bypassed");
         }
       }).catch(() => {

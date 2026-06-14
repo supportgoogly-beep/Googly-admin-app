@@ -123,8 +123,8 @@ function AppContent() {
     import("firebase/auth").then(({ onAuthStateChanged }) => {
       try {
         const unsubscribe = onAuthStateChanged(auth(), async (user) => {
-          setIsLoggedIn(!!user);
           if (user) {
+            setIsLoggedIn(true);
             setRawProfile(p => ({ 
               ...p, 
               name: user.displayName || p.name || "", 
@@ -134,12 +134,43 @@ function AppContent() {
             if (profileData) {
               setRawProfile(p => ({ ...p, name: profileData.name || p.name, email: profileData.email || p.email }));
             }
+          } else {
+            const storedMock = localStorage.getItem("mock_firebase_user");
+            if (storedMock) {
+              try {
+                const mockUser = JSON.parse(storedMock);
+                setIsLoggedIn(true);
+                setRawProfile(p => ({ 
+                  ...p, 
+                  name: mockUser.displayName || p.name || "", 
+                  email: mockUser.email || p.email || "" 
+                }));
+              } catch (e) {
+                setIsLoggedIn(false);
+              }
+            } else {
+              setIsLoggedIn(false);
+            }
           }
           setIsLoading(false);
         });
         return unsubscribe;
       } catch (err) {
-        console.warn("Firebase Auth unavailable:", err);
+        console.warn("Firebase Auth unavailable, checking mock auth:", err);
+        const storedMock = localStorage.getItem("mock_firebase_user");
+        if (storedMock) {
+          try {
+            const user = JSON.parse(storedMock);
+            setIsLoggedIn(true);
+            setRawProfile(p => ({ 
+              ...p, 
+              name: user.displayName || p.name || "", 
+              email: user.email || p.email || "" 
+            }));
+          } catch (e) {
+            // ignore
+          }
+        }
         setIsLoading(false);
       }
     });
@@ -230,40 +261,68 @@ function AppContent() {
   }
 
   const handleSendOTP = async (email: string) => {
-    setIsLoading(true);
     try {
       const normEmail = email.toLowerCase().trim();
       
-      // Verification: Only allow registered owners or staff to reset
-      // This enforces the "Only the user who registered can use forgot password" rule
       const isRegistered = normEmail === "ruhandharpurkayastha@gmail.com" || staff.some(s => s.email?.toLowerCase().trim() === normEmail);
       
       if (!isRegistered) {
         throw new Error("This email is not registered in the Googly master directory.");
       }
 
-      // Use native Firebase Password Reset (works on Netlify/Static)
-      // This replaces the broken custom SMTP OTP flow
-      await resetPassword(email);
-      triggerToast("Reset Link Sent", "A secure password reset link has been dispatched to your Gmail.", "success");
+      const res = await fetch(getApiUrl("/api/auth/send-otp"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send code.");
+
+      triggerToast("Code Sent", "A secure code has been dispatched to your email.", "success");
+      
+      // Fallback for previewing without SMTP
+      if (data.otp) {
+        triggerToast("Mock OTP Received", `Your verification code is: ${data.otp}`, "info");
+      }
     } catch (err: any) {
       const msg = err.message === "Not Registered" ? "Entity not recognized." : err.message;
       triggerToast("System Blocked", msg, "error");
-    } finally {
-      setIsLoading(false);
+      throw err;
     }
   }
 
   const handleVerifyOTP = async (email: string, otp: string) => {
-    // Note: With native Firebase Reset, this step is bypassed as the user resets via the link.
-    // We return true to allow the UI to advance if needed, but the link is the real fix.
-    triggerToast("Link Activated", "Please follow the instructions in your email to finalize security.", "info");
-    return true;
+    try {
+      const res = await fetch(getApiUrl("/api/auth/verify-otp"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Invalid OTP code.");
+      triggerToast("Code Verified", "Please complete the security check.", "success");
+      return true;
+    } catch (err: any) {
+      triggerToast("Verification Failed", err.message, "error");
+      throw err;
+    }
   }
 
   const handleResetPassword = async (email: string, newPass: string, otp: string) => {
-    // This is now handled by the official Firebase security page linked in the email.
-    triggerToast("Security Update", "Please use the official Firebase reset page via the email link.", "info");
+    try {
+      const res = await fetch(getApiUrl("/api/auth/reset-password"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, newPassword: newPass, otp })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update security credentials.");
+      
+      triggerToast("Security Update", "Master access key updated. You may now initialize.", "success");
+    } catch (err: any) {
+      triggerToast("Reset Failed", err.message, "error");
+      throw err;
+    }
   }
 
   // --- UI Elements State ---

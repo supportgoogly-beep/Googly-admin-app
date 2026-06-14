@@ -62,10 +62,14 @@ export default function ProfileSecurityDashboard({
   const [employeeId, setEmployeeId] = useState("EMP-2026-X8914");
     
   useEffect(() => {
-    const user = auth().currentUser;
-    if (user) {
-      setFullName(user.displayName || profile.name || "Ruhandhar Purkayastha");
-      setUserEmail(user.email || profile.email || "ruhandharpurkayastha@gmail.com");
+    try {
+      const user = auth().currentUser;
+      if (user) {
+        setFullName(user.displayName || profile.name || "Ruhandhar Purkayastha");
+        setUserEmail(user.email || profile.email || "ruhandharpurkayastha@gmail.com");
+      }
+    } catch (e) {
+      console.warn("Firebase Auth unavailable:", e);
     }
   }, []);
   
@@ -288,7 +292,13 @@ export default function ProfileSecurityDashboard({
     }
     
     // Update Firebase Profile
-    const user = auth().currentUser;
+    let user = null;
+    try {
+      user = auth().currentUser;
+    } catch (e) {
+      console.warn("Firebase Auth unavailable:", e);
+    }
+    
     if (user) {
         try {
             await updateProfile(user, { displayName: fullName });
