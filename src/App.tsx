@@ -166,6 +166,8 @@ function AppContent() {
               const checkData = await checkRes.json().catch(() => ({}));
               throw new Error(checkData.error || "Not Registered");
             }
+            // For other errors (like 404 on static hosts), trigger the fallback block by throwing
+            throw new Error(`Server status ${checkRes.status}`);
           }
         } catch (apiErr: any) {
           // If the error was explicitly "Not Registered", we propagate it

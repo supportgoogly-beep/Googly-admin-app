@@ -622,8 +622,8 @@ async function startServer() {
       
       // Update the user's password in Firebase Auth via Admin SDK if available
       try {
-        const user = await admin.auth().getUserByEmail(email);
-        await admin.auth().updateUser(user.uid, { password: newPassword });
+        const user = await (admin as any).auth().getUserByEmail(email);
+        await (admin as any).auth().updateUser(user.uid, { password: newPassword });
         console.log(`[AUTH] Firebase Password for ${email} updated successfully via Admin SDK.`);
       } catch (authErr: any) {
         console.warn("[AUTH] Failed to update password in Firebase Auth via Admin SDK (this is normal if Firebase Admin credentials are not fully configured yet):", authErr.message);
