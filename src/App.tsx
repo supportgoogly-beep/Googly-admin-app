@@ -177,24 +177,17 @@ function AppContent() {
           // Otherwise, if it was a 404 (endpoint not found) or network error, use client-side whitelist fallback
           console.warn("API check-authorized failed or server unreachable, falling back to local client verification:", apiErr);
           const localWhitelist = [
-            "ruhandharpurkayastha@gmail.com",
-            "admin@googlydelivery.in",
-            "shyam.support@googly.com",
-            "reema.ops@googly.com",
-            "devlina.sen@yahoo.com"
+            "ruhandharpurkayastha@gmail.com"
           ];
           const normEmail = authEmail.toLowerCase().trim();
           if (localWhitelist.includes(normEmail)) {
             isAuthorized = true;
           } else {
-            const storedWhitelist = JSON.parse(localStorage.getItem("authorized_admins_local") || "[]");
-            if (storedWhitelist.includes(normEmail)) {
+            // Check dynamically loaded staff from Supabase (staff data is reactive)
+            // Note: If VITE_SUPABASE_URL is missing on Netlify, this will remain []
+            const isStaffMember = staff.some(s => s.email.toLowerCase().trim() === normEmail);
+            if (isStaffMember) {
               isAuthorized = true;
-            } else {
-              console.log("Client-side fallback: Auto-authorizing email in static fallback/offline mode.");
-              isAuthorized = true;
-              const newWhitelist = [...storedWhitelist, normEmail];
-              localStorage.setItem("authorized_admins_local", JSON.stringify(newWhitelist));
             }
           }
         }
@@ -296,8 +289,14 @@ function AppContent() {
         triggerToast("Update Error", displayMsg, "error");
         throw err;
       }
-      console.warn("API reset-password failed, fallback to client update:", err);
-      triggerToast("Parameters Finalized (Offline Mode)", "Local security credentials updated successfully in offline/static fallback.", "success");
+      console.warn("API reset-password failed, executing real-time fallback via Firebase SDK (compatible with static hosting):", err);
+      try {
+        await resetPassword(email);
+        triggerToast("Reset Link Transmitted", "An encrypted security link has been dispatched to your verified inbox. Use it to finalize parameters.", "success");
+      } catch (fbErr: any) {
+        triggerToast("Transmission Failure", fbErr.message, "error");
+        throw fbErr;
+      }
     }
   }
 

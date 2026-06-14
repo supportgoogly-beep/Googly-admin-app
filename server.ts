@@ -32,11 +32,7 @@ const whitelistPath = path.join(process.cwd(), "authorized_admins_local.json");
 
 // Preloaded trusted default emails
 const DEFAULT_WHITELIST = [
-  "ruhandharpurkayastha@gmail.com",
-  "admin@googlydelivery.in",
-  "shyam.support@googly.com",
-  "reema.ops@googly.com",
-  "devlina.sen@yahoo.com"
+  "ruhandharpurkayastha@gmail.com"
 ];
 
 // Ensure the local whitelist storage file is present
@@ -80,19 +76,29 @@ async function isEmailAuthorized(email: string): Promise<boolean> {
     return true;
   }
 
-  // 2. Check Supabase 'authorized_admins' table if configured
+  // 2. Check Supabase 'authorized_admins' and 'city_staff' tables if configured
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      // Check authorized_admins
+      const { data: adminData } = await supabase
         .from("authorized_admins")
         .select("email")
         .eq("email", normEmail);
-      if (!error && data && data.length > 0) {
+      if (adminData && adminData.length > 0) {
+        return true;
+      }
+
+      // Check city_staff
+      const { data: staffData } = await supabase
+        .from("city_staff")
+        .select("email")
+        .eq("email", normEmail);
+      if (staffData && staffData.length > 0) {
         return true;
       }
     } catch (e) {
-      console.warn("Supabase query bypass warning (table might not exist):", e);
+      console.warn("Supabase query bypass warning (tables might not exist):", e);
     }
   }
 

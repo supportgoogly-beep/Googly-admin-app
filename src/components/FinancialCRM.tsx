@@ -239,7 +239,13 @@ export default function FinancialCRM({
 
       {/* --- FEATURE 21: ROLE-BASED ACCESS CONTROL (RBAC) --- */}
       {currentTab === "rbac" && (
-        <RbacSettingsDashboard triggerToast={triggerToast} />
+        <RbacSettingsDashboard 
+          triggerToast={triggerToast} 
+          staff={staff}
+          addStaff={addStaff}
+          updateStaff={updateStaff}
+          deleteStaff={deleteStaff}
+        />
       )}
 
       {/* --- PAYOUT BATCH BANK CONFIRMATION MODAL --- */}

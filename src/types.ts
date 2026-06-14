@@ -287,7 +287,7 @@ export interface StaffMember {
   id: string;
   name: string;
   email: string;
-  role: "Sub-Admin" | "Support Specialist" | "Operations Manager" | "Financial Auditor";
+  role: string;
   permissions: {
     dashboard: boolean;
     orders: boolean;
@@ -300,6 +300,18 @@ export interface StaffMember {
   };
   active: boolean;
   city?: string;
+  phone?: string;
+  department?: string;
+  designation?: string;
+  avatar?: string;
+  employeeId?: string;
+  security?: {
+    forcePasswordChange: boolean;
+    enable2fa: boolean;
+    restrictIp: string;
+    restrictDevice: string;
+  };
+  permissionsOverride?: any;
 }
 
 export interface GlobalSettings {

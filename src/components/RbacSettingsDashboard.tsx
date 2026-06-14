@@ -347,11 +347,23 @@ const INITIAL_AUDIT_LOGS: AuditLog[] = [
   }
 ];
 
+import { StaffMember } from "../types";
+
 interface RbacSettingsDashboardProps {
   triggerToast: (title: string, message: string, type: "success" | "error" | "info") => void;
+  staff?: StaffMember[];
+  addStaff?: (item: Omit<StaffMember, "id">) => Promise<any>;
+  updateStaff?: (id: string, updates: Partial<StaffMember>) => Promise<void>;
+  deleteStaff?: (id: string) => Promise<void>;
 }
 
-export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDashboardProps) {
+export default function RbacSettingsDashboard({ 
+  triggerToast,
+  staff: externalStaff,
+  addStaff: externalAddStaff,
+  updateStaff: externalUpdateStaff,
+  deleteStaff: externalDeleteStaff
+}: RbacSettingsDashboardProps) {
   const { cities } = useCityContext();
 
   // Cities & Regions available
@@ -363,17 +375,32 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
   const [localDark, setLocalDark] = useState(false);
 
   // Core State Managers
-  const [staffList, setStaffList] = useState<RbacStaff[]>(() => {
-    const saved = localStorage.getItem("googly_rbac_staffList");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // fallback
-      }
+  const [staffList, setStaffList] = useState<RbacStaff[]>([]);
+
+  // Sync external staff collection from Supabase
+  useEffect(() => {
+    if (externalStaff && externalStaff.length > 0) {
+      const mapped: RbacStaff[] = externalStaff.map(s => ({
+        id: s.id,
+        name: s.name,
+        employeeId: s.employeeId || `EMP-${s.id.substring(0, 4)}`,
+        email: s.email,
+        phone: s.phone || "",
+        department: (s.department as any) || "Operations",
+        designation: s.designation || s.role || "Specialist",
+        role: s.role,
+        assignedCity: s.city || "Kolkata",
+        assignedZones: [s.city || "Kolkata"],
+        status: s.active ? "Active" : "Pending Activation",
+        lastLogin: "Never",
+        createdDate: new Date().toISOString().split("T")[0],
+        avatar: s.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+        security: s.security,
+        permissionsOverride: s.permissionsOverride
+      }));
+      setStaffList(mapped);
     }
-    return []; // Empty by default so demo items do not appear
-  });
+  }, [externalStaff]);
 
   const [roles, setRoles] = useState<RbacRole[]>(() => {
     const saved = localStorage.getItem("googly_rbac_roles");
@@ -650,7 +677,7 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
   };
 
   // Execute Final Creation & Activation
-  const handleConfirmActivation = (statusOverride?: RbacStaff["status"]) => {
+  const handleConfirmActivation = async (statusOverride?: RbacStaff["status"]) => {
     setShowConfirmationModal(false);
     setShowAddStaffPanel(false);
 
@@ -686,75 +713,88 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
       permissionsOverride: useCustomPermissions ? customPermissions : undefined
     };
 
-    if (isEditingStaff && editingStaffId) {
-      // Edit mode
-      setStaffList(prev => prev.map(s => s.id === editingStaffId ? newStaffItem : s));
-      triggerToast("Staff Credentials Updated", `Altered operational bounds of ${staffForm.name}.`, "success");
-      
-      // Save Audit Trace
-      const appendAudit: AuditLog = {
-        id: `ADT-${Math.floor(1000 + Math.random() * 9000)}`,
-        staffName: staffForm.name,
-        action: "Staff Record Modified",
-        roleChanged: `Role: ${staffForm.role}`,
-        permissionsUpdated: useCustomPermissions ? "Assigned custom modular override matrix" : "Re-synced to primary role hierarchy",
-        modifiedBy: "ruhandharpurkayastha (Owner)",
-        dateTime: "2566-06-12 10:54 AM"
-      };
-      setAuditLogs(prev => [appendAudit, ...prev]);
+    // Prepare Supabase StaffMember object
+    const supabaseStaff: Omit<StaffMember, "id"> = {
+      name: newStaffItem.name,
+      email: newStaffItem.email,
+      role: newStaffItem.role,
+      permissions: {
+        dashboard: true,
+        orders: true,
+        restaurants: true,
+        riders: true,
+        pricing: true,
+        crm: true,
+        finances: true,
+        settings: true
+      },
+      active: newStaffItem.status === "Active",
+      city: newStaffItem.assignedCity,
+      phone: newStaffItem.phone,
+      department: newStaffItem.department,
+      designation: newStaffItem.designation,
+      avatar: newStaffItem.avatar,
+      employeeId: newStaffItem.employeeId,
+      security: newStaffItem.security,
+      permissionsOverride: newStaffItem.permissionsOverride
+    };
 
-    } else {
-      // Add mode
-      setStaffList(prev => [newStaffItem, ...prev]);
-      triggerToast("Staff Account Instantiated", `Successfully registered ${staffForm.name} operational catalog.`, "success");
-
-      // Set Welcome Email data
-      const activeGrantedText: string[] = [];
-      const permissionsMap = useCustomPermissions ? customPermissions : (roles.find(r => r.name === staffForm.role)?.permissions || createPermissionsSet(false));
-      MODULE_LIST.forEach(m => {
-        const p = permissionsMap[m];
-        if (p?.view) {
-          const levels = [
-            p.view ? "View" : "",
-            p.create ? "Create" : "",
-            p.edit ? "Edit" : "",
-            p.delete ? "Delete" : "",
-            p.approve ? "Approve" : "",
-            p.export ? "Export" : "",
-            p.manageSettings ? "ManageSettings" : ""
-          ].filter(Boolean).join(", ");
-          activeGrantedText.push(`${m} (${levels})`);
+    try {
+      if (isEditingStaff && editingStaffId) {
+        // Edit mode
+        if (externalUpdateStaff) {
+          await externalUpdateStaff(editingStaffId, supabaseStaff);
+        } else {
+          setStaffList(prev => prev.map(s => s.id === editingStaffId ? newStaffItem : s));
         }
-      });
-
-      setLatestEmailPayload({
-        staffName: staffForm.name,
-        email: staffForm.email,
-        tempPw: tempGeneratedPw,
-        role: staffForm.role,
-        assignedCity: staffForm.assignedCity,
-        assignedZones: staffForm.assignedZones,
-        permissionsText: activeGrantedText
-      });
-
-      // Show welcome automated invite step
-      if (staffForm.sendInvitationEmail) {
-        setTimeout(() => {
-          setShowWelcomeEmailModal(true);
-        }, 300);
+        triggerToast("Staff Credentials Updated", `Altered operational bounds of ${staffForm.name}.`, "success");
+      } else {
+        // Add mode
+        if (externalAddStaff) {
+          await externalAddStaff(supabaseStaff);
+        } else {
+          setStaffList(prev => [newStaffItem, ...prev]);
+        }
+        triggerToast("Staff Account Instantiated", `Successfully registered ${staffForm.name} operational catalog.`, "success");
       }
+    } catch (err: any) {
+      triggerToast("Persistence Error", err.message, "error");
+    }
 
-      // Save Audit Trace
-      const appendAudit: AuditLog = {
-        id: `ADT-${Math.floor(1000 + Math.random() * 9000)}`,
-        staffName: staffForm.name,
-        action: "Automatic Invitation Generated & Activated",
-        roleChanged: `Assigned Role: ${staffForm.role}`,
-        permissionsUpdated: `Allocated ${activeGrantedText.length} direct workspace modules`,
-        modifiedBy: "ruhandharpurkayastha (Owner)",
-        dateTime: "2026-06-12 10:54 AM"
-      };
-      setAuditLogs(prev => [appendAudit, ...prev]);
+    // Set Welcome Email data
+    const activeGrantedText: string[] = [];
+    const permissionsMap = useCustomPermissions ? customPermissions : (roles.find(r => r.name === staffForm.role)?.permissions || createPermissionsSet(false));
+    MODULE_LIST.forEach(m => {
+      const p = permissionsMap[m];
+      if (p?.view) {
+        const levels = [
+          p.view ? "View" : "",
+          p.create ? "Create" : "",
+          p.edit ? "Edit" : "",
+          p.delete ? "Delete" : "",
+          p.approve ? "Approve" : "",
+          p.export ? "Export" : "",
+          p.manageSettings ? "ManageSettings" : ""
+        ].filter(Boolean).join(", ");
+        activeGrantedText.push(`${m} (${levels})`);
+      }
+    });
+
+    setLatestEmailPayload({
+      staffName: staffForm.name,
+      email: staffForm.email,
+      tempPw: tempGeneratedPw,
+      role: staffForm.role,
+      assignedCity: staffForm.assignedCity,
+      assignedZones: staffForm.assignedZones,
+      permissionsText: activeGrantedText
+    });
+
+    // Show welcome automated invite step
+    if (staffForm.sendInvitationEmail) {
+      setTimeout(() => {
+        setShowWelcomeEmailModal(true);
+      }, 300);
     }
 
     // Reset Form
@@ -823,12 +863,21 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
   };
 
   // Revoke/Delete Staff
-  const handleDeleteStaff = (staffId: string) => {
+  const handleDeleteStaff = async (staffId: string) => {
     const targetStaff = staffList.find(s => s.id === staffId);
     if (!targetStaff) return;
 
-    setStaffList(prev => prev.filter(s => s.id !== staffId));
-    triggerToast("Identity Purged", `${targetStaff.name} removed from active enterprise index directory.`, "error");
+    try {
+      if (externalDeleteStaff) {
+        await externalDeleteStaff(staffId);
+        triggerToast("Access Revoked", "Account credentials invalidated from real-time nodes.", "success");
+      } else {
+        setStaffList(prev => prev.filter(s => s.id !== staffId));
+        triggerToast("Access Revoked", "Account credentials invalidated from local cache pool.", "info");
+      }
+    } catch (err: any) {
+      triggerToast("Deletion Failed", err.message, "error");
+    }
 
     const appendAudit: AuditLog = {
       id: `ADT-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -840,6 +889,8 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
       dateTime: "2026-06-12 10:54 AM"
     };
     setAuditLogs(prev => [appendAudit, ...prev]);
+    setShowDeleteConfirmation(false);
+    setStaffToDelete(null);
   };
 
   // CSV List Export Download
