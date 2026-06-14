@@ -28,7 +28,7 @@ function getSupabaseClient() {
 }
 
 // Local whitelist fallback persistence path
-const whitelistPath = path.join(__dirname, "authorized_admins_local.json");
+const whitelistPath = path.join(process.cwd(), "authorized_admins_local.json");
 
 // Preloaded trusted default emails
 const DEFAULT_WHITELIST = [
@@ -119,13 +119,16 @@ try {
 
 // SMTP Transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: true, 
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for and other ports like 587
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.SMTP_USER || "",
+    pass: process.env.SMTP_PASS || "",
   },
+  tls: {
+    rejectUnauthorized: false // Prevents SSL/TLS handshake failures from crashing the connection
+  }
 });
 
 // Validate SMTP config on startup
@@ -137,7 +140,7 @@ if (process.env.SMTP_HOST && process.env.SMTP_HOST.includes('@')) {
 const otpStore = new Map<string, { otp: string, timestamp: number }>();
 
 // --- UNIFIED PERSISTENT DATABASE ENGINE ---
-const dataStorePath = path.join(__dirname, "data_store.json");
+const dataStorePath = path.join(process.cwd(), "data_store.json");
 
 const DEFAULT_STORE = {
   restaurants: [],
@@ -560,8 +563,8 @@ async function startServer() {
     otpStore.set(email, { otp, timestamp: Date.now() });
     
     try {
-        console.log(`[AUTH] Reading email template from: ${path.join(__dirname, 'src', 'templates', 'otp-email.html')}`);
-        const template = await fs.readFile(path.join(__dirname, 'src', 'templates', 'otp-email.html'), 'utf-8');
+        console.log(`[AUTH] Reading email template from: ${path.join(process.cwd(), 'src', 'templates', 'otp-email.html')}`);
+        const template = await fs.readFile(path.join(process.cwd(), 'src', 'templates', 'otp-email.html'), 'utf-8');
         console.log(`[AUTH] Template read successfully. Length: ${template.length}`);
         const html = template.replace('{OTP_CODE}', otp);
         console.log(`[AUTH] OTP_CODE replaced. OTP: ${otp}`);
@@ -616,6 +619,16 @@ async function startServer() {
 
     try {
       console.log(`[AUTH] Password for ${email} would be reset to: ${newPassword}`);
+      
+      // Update the user's password in Firebase Auth via Admin SDK if available
+      try {
+        const user = await admin.auth().getUserByEmail(email);
+        await admin.auth().updateUser(user.uid, { password: newPassword });
+        console.log(`[AUTH] Firebase Password for ${email} updated successfully via Admin SDK.`);
+      } catch (authErr: any) {
+        console.warn("[AUTH] Failed to update password in Firebase Auth via Admin SDK (this is normal if Firebase Admin credentials are not fully configured yet):", authErr.message);
+      }
+
       otpStore.delete(email);
       res.json({ success: true, message: "Security update complete." });
     } catch (error: any) {

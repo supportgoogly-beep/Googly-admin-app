@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useCityContext } from "../context/CityContext";
 import { getApiUrl } from "../lib/api";
 import {
   Shield, ShieldAlert, ShieldCheck, Key, Lock, Users, UserPlus, Search, Filter,
@@ -351,6 +352,13 @@ interface RbacSettingsDashboardProps {
 }
 
 export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDashboardProps) {
+  const { cities } = useCityContext();
+
+  // Cities & Regions available
+  const AVAILABLE_CITIES = useMemo(() => {
+    return cities && cities.length > 0 ? cities : ["Kolkata", "Howrah", "Salt Lake", "New Town", "South Kolkata Zone"];
+  }, [cities]);
+
   // Theme Toggle: Support dark/light visual style inside the container beautifully
   const [localDark, setLocalDark] = useState(false);
 
@@ -511,6 +519,23 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
     restrictDevice: ""
   });
 
+  // Automatically update the default assigned city and zone as soon as AVAILABLE_CITIES loader resolves
+  useEffect(() => {
+    if (AVAILABLE_CITIES.length > 0 && !isEditingStaff) {
+      const defaultCity = AVAILABLE_CITIES[0];
+      setStaffForm(prev => {
+        if (!AVAILABLE_CITIES.includes(prev.assignedCity)) {
+          return {
+            ...prev,
+            assignedCity: defaultCity,
+            assignedZones: [defaultCity]
+          };
+        }
+        return prev;
+      });
+    }
+  }, [AVAILABLE_CITIES, isEditingStaff]);
+
   // Custom permission matrix in add staff form
   const [customPermissions, setCustomPermissions] = useState<Record<ModuleKey, PermissionValue>>(createPermissionsSet(false));
   const [useCustomPermissions, setUseCustomPermissions] = useState(false);
@@ -554,9 +579,6 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
       suspended: staffList.filter(s => s.status === "Suspended" || s.status === "Disabled").length
     };
   }, [staffList]);
-
-  // Cities & Regions available
-  const AVAILABLE_CITIES = ["Kolkata", "Howrah", "Salt Lake", "New Town", "South Kolkata Zone"];
 
   // Filter and Search Evaluation
   const filteredStaffList = useMemo(() => {
@@ -941,8 +963,8 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
                 department: "Operations",
                 designation: "",
                 role: "City-Level Admin",
-                assignedCity: "Kolkata",
-                assignedZones: ["Kolkata"],
+                assignedCity: AVAILABLE_CITIES[0] || "Kolkata",
+                assignedZones: [AVAILABLE_CITIES[0] || "Kolkata"],
                 status: "Pending Activation",
                 address: "",
                 avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
@@ -1974,7 +1996,7 @@ export default function RbacSettingsDashboard({ triggerToast }: RbacSettingsDash
                         onChange={(e) => setStaffForm(prev => ({ ...prev, assignedCity: e.target.value, assignedZones: [e.target.value] }))}
                         className={`w-full p-2.5 rounded-xl border focus:ring-1 focus:ring-[#E23744] ${localDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-200 text-slate-800"}`}
                       >
-                        {AVAILABLE_CITIES.slice(0, 3).map(city => (
+                        {AVAILABLE_CITIES.map(city => (
                           <option key={city} value={city}>{city}</option>
                         ))}
                       </select>
