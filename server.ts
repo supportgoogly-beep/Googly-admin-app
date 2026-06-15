@@ -328,27 +328,32 @@ async function startServer() {
   }
 }
 
+  // --- UNIFIED API ROUTER ENVELOPE ---
+  const apiRouter = express.Router();
+
   // --- UNIFIED DATABASE RECONCILIATION ROUTE ---
-  app.get("/api/data/load", async (req, res) => {
+  apiRouter.get("/data/load", async (req, res) => {
     try {
       const dbState = await getDataStore();
       res.json(dbState);
     } catch (err: any) {
+      console.error("[DATABASE] Error loading data state:", err);
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post("/api/data/reset", async (req, res) => {
+  apiRouter.post("/data/reset", async (req, res) => {
     try {
       await saveDataStore(DEFAULT_STORE);
       res.json({ success: true, message: "Database reset to empty state." });
     } catch (err: any) {
+      console.error("[DATABASE] Error resetting data state:", err);
       res.status(500).json({ error: err.message });
     }
   });
 
   // --- SUPABASE STORAGE UPLOAD ENDPOINT ---
-  app.post("/api/storage/upload", upload.single("file"), async (req, res) => {
+  apiRouter.post("/storage/upload", upload.single("file"), async (req, res) => {
     try {
       const file = req.file;
       if (!file) {
@@ -397,7 +402,7 @@ async function startServer() {
   // --- REAL-TIME REPLICATION & MULTI-DEVICE BROADCAST HUB (SSE) ---
   const sseClients = new Set<any>();
 
-  app.get("/api/realtime/sync-stream", (req, res) => {
+  apiRouter.get("/realtime/sync-stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -414,7 +419,7 @@ async function startServer() {
     });
   });
 
-  app.post("/api/realtime/publish", async (req, res) => {
+  apiRouter.post("/realtime/publish", async (req, res) => {
     const { event, table, row, rowId, origin } = req.body;
 
     // Persist event into database state
@@ -468,7 +473,7 @@ async function startServer() {
   });
 
   // Whitelist/Check-Authorized endpoints
-  app.post("/api/auth/check-authorized", async (req, res) => {
+  apiRouter.post("/auth/check-authorized", async (req, res) => {
     try {
       const { email } = req.body;
       if (!email) {
@@ -480,12 +485,13 @@ async function startServer() {
       }
       res.json({ authorized: true });
     } catch (err: any) {
+      console.error("[AUTH] Authorized status verification error:", err);
       res.status(500).json({ error: "Server error", details: err?.message });
     }
   });
 
   // Whitelist management endpoints (for Super Admin dashboard controls)
-  app.get("/api/auth/whitelist", async (req, res) => {
+  apiRouter.get("/auth/whitelist", async (req, res) => {
     try {
       const localList = await getLocalWhitelist();
       const combined = new Set<string>(localList);
@@ -519,11 +525,12 @@ async function startServer() {
 
       res.json(Array.from(combined));
     } catch (err: any) {
+      console.error("[AUTH] Whitelist grab error:", err);
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post("/api/auth/whitelist", async (req, res) => {
+  apiRouter.post("/auth/whitelist", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email coordinate is required" });
     const normEmail = email.toLowerCase().trim();
@@ -563,11 +570,12 @@ async function startServer() {
 
       res.json({ success: true, message: `Access granted for ${normEmail}.` });
     } catch (err: any) {
+      console.error("[AUTH] Whitelist save error:", err);
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.delete("/api/auth/whitelist", async (req, res) => {
+  apiRouter.delete("/auth/whitelist", async (req, res) => {
     const { email } = req.query;
     if (!email) return res.status(400).json({ error: "Email coordinate is required" });
     const normEmail = (email as string).toLowerCase().trim();
@@ -603,12 +611,13 @@ async function startServer() {
 
       res.json({ success: true, message: `Access revoked for ${normEmail}.` });
     } catch (err: any) {
+      console.error("[AUTH] Whitelist delete error:", err);
       res.status(500).json({ error: err.message });
     }
   });
 
   // API route to delete a user from Firebase Authentication
-  app.post("/api/auth/delete-user", async (req, res) => {
+  apiRouter.post("/auth/delete-user", async (req, res) => {
     const { uid, email } = req.body;
     if (!uid && !email) {
       return res.status(400).json({ error: "UID or Email coordinate is required" });
@@ -632,13 +641,13 @@ async function startServer() {
       }
       res.json({ success: true, message: "User successfully deleted from Firebase Auth." });
     } catch (err: any) {
-      console.error("Failed to delete user from Firebase Auth:", err);
+      console.error("[AUTH] Failed to delete user from Firebase Auth:", err);
       res.status(500).json({ error: err.message });
     }
   });
 
   // API route to proxy Nominatim requests
-  app.get("/api/proxy-nominatim", async (req, res) => {
+  apiRouter.get("/proxy-nominatim", async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ error: "Missing query parameter" });
     try {
@@ -647,19 +656,22 @@ async function startServer() {
       });
       res.json(await response.json());
     } catch (error) {
+      console.error("[MAP-PROXY] Nominatim fetch failure:", error);
       res.status(500).json({ error: "Failed to fetch from Nominatim" });
     }
   });
 
   // OTP Endpoints with strict access checks
-  app.post("/api/auth/send-otp", async (req, res) => {
+  apiRouter.post("/auth/send-otp", async (req, res) => {
     try {
       const { email } = req.body;
+      console.log(`[AUTH] Forgot Password Request Received for email: ${email}`);
       if (!email) return res.status(400).json({ error: "Email required" });
       
       // Strict block on direct sign-ups / reset requests for unregistered users
       const isAuthorized = await isEmailAuthorized(email);
       if (!isAuthorized) {
+        console.warn(`[AUTH] Forgot password rejected: ${email} is not registered in authorized admins.`);
         return res.status(403).json({ error: "Not Registered" });
       }
 
@@ -671,6 +683,7 @@ async function startServer() {
 
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.warn(`[AUTH] SMTP NOT CONFIGURED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
+        console.log(`[AUTH] Password Reset Email Sent to ${email} (Mock mode logs)`);
         return res.json({ message: "Code transmitted (Mock mode - Check server logs)", otp });
       }
 
@@ -681,15 +694,15 @@ async function startServer() {
           text: `Your verification code is: ${otp}. It is valid for 5 minutes.`,
           html: html,
       });
-      console.log(`[AUTH] Email sent successfully to ${email}`);
+      console.log(`[AUTH] Password Reset Email Sent to ${email}`);
       res.json({ message: "OTP transmitted successfully." });
     } catch (err: any) {
-      console.error("Email delivery failed or error in send-otp:", err);
-      res.status(500).json({ error: "An interval server error occurred", details: err?.message });
+      console.error(`[AUTH] Email sending failed for ${req.body?.email || "unknown"}:`, err);
+      res.status(500).json({ error: "An internal server error occurred", details: err?.message });
     }
   });
 
-  app.post("/api/auth/verify-otp", async (req, res) => {
+  apiRouter.post("/auth/verify-otp", async (req, res) => {
     try {
       const { email, otp } = req.body;
       if (!email) return res.status(400).json({ error: "Email is required" });
@@ -702,33 +715,39 @@ async function startServer() {
 
       const stored = otpStore.get(email);
       if (stored && stored.otp === otp && (Date.now() - stored.timestamp < 300000)) {
+        console.log(`[AUTH] Token Validated successfully for ${email}`);
         res.json({ success: true, message: "Identity verified." });
       } else {
+        console.warn(`[AUTH] Token Verification failed or expired for ${email}`);
         res.status(400).json({ success: false, error: "Invalid or expired OTP code." });
       }
     } catch (err: any) {
+      console.error("[AUTH] Error in verify-otp:", err);
       res.status(500).json({ error: "Server error", details: err?.message });
     }
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  apiRouter.post("/auth/reset-password", async (req, res) => {
     try {
       const { email, newPassword, otp } = req.body;
+      console.log(`[AUTH] Reset Password Request Received for email: ${email}`);
       if (!email) return res.status(400).json({ error: "Email is required" });
 
       // Strict validation
       const isAuthorized = await isEmailAuthorized(email);
       if (!isAuthorized) {
+        console.warn(`[AUTH] Reset password rejected: ${email} is not registered.`);
         return res.status(403).json({ error: "Not Registered" });
       }
 
       const stored = otpStore.get(email);
       if (!stored || stored.otp !== otp) {
+        console.warn(`[AUTH] Verification mismatch during password reset for ${email}`);
         return res.status(401).json({ error: "Verification mismatch." });
       }
 
       try {
-        console.log(`[AUTH] Password for ${email} would be reset to: ${newPassword}`);
+        console.log(`[AUTH] Password for ${email} is being updated.`);
         
         // Update the user's password in Firebase Auth via Admin SDK if available
         try {
@@ -740,14 +759,21 @@ async function startServer() {
         }
 
         otpStore.delete(email);
+        console.log(`[AUTH] Password successfully updated for ${email}`);
         res.json({ success: true, message: "Security update complete." });
       } catch (error: any) {
+        console.error(`[AUTH] Password reset execution error for ${email}:`, error);
         res.status(500).json({ error: error.message });
       }
     } catch (err: any) {
+      console.error("[AUTH] Error in reset-password endpoint:", err);
       res.status(500).json({ error: "Server error", details: err?.message });
     }
   });
+
+  // Mount the apiRouter under both "/api" (local dev) and "/" (serverless base path stripping fallback)
+  app.use("/api", apiRouter);
+  app.use("/", apiRouter);
 
 const isServerlessEnvironment = process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.SERVERLESS;
 if (!isServerlessEnvironment) {
