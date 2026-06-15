@@ -142,16 +142,21 @@ try {
 
 // SMTP Transporter
 const transporter = nodemailer.createTransport({
+  pool: true, // Reuse SMTP connections to dramatically speed up consecutive OTP transmissions
+  maxConnections: 3,
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
-  secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for and other ports like 587
+  secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for other ports like 587
   auth: {
     user: process.env.SMTP_USER || "",
     pass: process.env.SMTP_PASS || "",
   },
   tls: {
     rejectUnauthorized: false // Prevents SSL/TLS handshake failures from crashing the connection
-  }
+  },
+  connectionTimeout: 8000,   // Fail fast if connection cannot be established within 8s
+  greetingTimeout: 8000,     // Fail fast if connection greeting is slow (8s)
+  socketTimeout: 12000       // Prevent infinite socket inactivity hangs
 });
 
 // Validate SMTP config on startup
@@ -301,6 +306,28 @@ export const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Normalize incoming API paths for both local development (/api/...) and serverless (/netlify/functions...)
+app.use((req, res, next) => {
+  const originalUrl = req.url;
+  
+  // Strip Netlify Functions prefix
+  if (req.url.startsWith("/.netlify/functions/api")) {
+    req.url = req.url.slice("/.netlify/functions/api".length);
+  } 
+  // Strip standard /api prefix
+  else if (req.url.startsWith("/api")) {
+    req.url = req.url.slice("/api".length);
+  }
+  
+  // Ensure the rewritten URL has a leading slash
+  if (!req.url.startsWith("/")) {
+    req.url = "/" + req.url;
+  }
+  
+  console.log(`[ROUTE_LOG] ${req.method} ${originalUrl} -> ${req.url}`);
+  next();
+});
 
 async function startServer() {
   // Vite middleware for development
