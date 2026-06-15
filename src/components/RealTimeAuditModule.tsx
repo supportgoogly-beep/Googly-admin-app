@@ -108,6 +108,11 @@ export default function RealTimeAuditModule({
     let ev: EventSource | null = null;
     try {
       ev = new EventSource("/api/realtime/sync-stream");
+      // Serverless environments drop SSE. Fallback polling for logs:
+      const fallbackInterval = setInterval(() => {
+        fetch("/api/realtime/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "PING", table: "audit", rowId: "ping" }) }).catch(() => {});
+      }, 10000);
+      (ev as any)._fallbackInterval = fallbackInterval;
       ev.onopen = () => {
         setSseConnected("healthy");
         addLog("SYSTEM", "SSE Broadcast Link Established. Listening for global database replication chunks...");
@@ -133,6 +138,7 @@ export default function RealTimeAuditModule({
 
       ev.onerror = () => {
         setSseConnected("failed");
+      if (ev && (ev as any)._fallbackInterval) clearInterval((ev as any)._fallbackInterval);
         addLog("SYSTEM", "SSE connection dropped. Retrying ambient socket connection...");
       };
     } catch (e) {

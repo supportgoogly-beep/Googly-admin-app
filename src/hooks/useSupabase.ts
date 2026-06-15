@@ -125,6 +125,7 @@ export function useSupabaseCollection<T extends { id: string }>(collectionName: 
     };
 
     fetchData();
+    const pollingInterval = setInterval(fetchData, 4000);
 
     // Subscribe to realtime database changes
     const channel = supabase
@@ -188,6 +189,7 @@ export function useSupabaseCollection<T extends { id: string }>(collectionName: 
     return () => {
       isMounted = false;
       supabase.removeChannel(channel);
+      clearInterval(pollingInterval);
       window.removeEventListener('supabase_local_sync', handleLocalSync);
     };
   }, [collectionName]);

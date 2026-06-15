@@ -89,6 +89,7 @@ export function useSupabaseFilteredCollection<T extends { id: string }>(
     };
 
     fetchData();
+    const pollingInterval = setInterval(fetchData, 4000);
 
     // Subscribe to realtime changes with filter
     const filterString = filterColumn && filterValue !== undefined ? `${filterColumn}=eq.${filterValue}` : undefined;
@@ -166,6 +167,7 @@ export function useSupabaseFilteredCollection<T extends { id: string }>(
     return () => {
       isMounted = false;
       supabase.removeChannel(channel);
+      clearInterval(pollingInterval);
       window.removeEventListener('supabase_local_sync', handleLocalSync);
     };
   }, [collectionName, filterColumn, filterValue]);
