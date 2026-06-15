@@ -125,6 +125,7 @@ function AppContent() {
         const unsubscribe = onAuthStateChanged(auth(), async (user) => {
           if (user) {
             setIsLoggedIn(true);
+            setAuthEmail(user.email || "");
             setRawProfile(p => ({ 
               ...p, 
               name: user.displayName || p.name || "", 
@@ -133,6 +134,7 @@ function AppContent() {
             const profileData = await getUserProfileFromSupabase(user.uid);
             if (profileData) {
               setRawProfile(p => ({ ...p, name: profileData.name || p.name, email: profileData.email || p.email }));
+              if (profileData.email) setAuthEmail(profileData.email);
             }
           } else {
             const storedMock = localStorage.getItem("mock_firebase_user");
@@ -140,6 +142,7 @@ function AppContent() {
               try {
                 const mockUser = JSON.parse(storedMock);
                 setIsLoggedIn(true);
+                setAuthEmail(mockUser.email || "");
                 setRawProfile(p => ({ 
                   ...p, 
                   name: mockUser.displayName || p.name || "", 
@@ -162,6 +165,7 @@ function AppContent() {
           try {
             const user = JSON.parse(storedMock);
             setIsLoggedIn(true);
+            setAuthEmail(user.email || "");
             setRawProfile(p => ({ 
               ...p, 
               name: user.displayName || p.name || "", 
@@ -1196,7 +1200,7 @@ function AppContent() {
                   taxSettings={taxSettings}
                   setTaxSettings={setTaxSettings}
                   triggerToast={triggerToast}
-                  currentUserEmail={authEmail}
+                  currentUserEmail={profile.email || authEmail}
                 />
               )}
 

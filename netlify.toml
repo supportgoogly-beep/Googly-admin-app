@@ -3,9 +3,12 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  NETLIFY = "true"
+
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/api/api/:splat"
   status = 200
 
 [[redirects]]

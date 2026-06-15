@@ -36,7 +36,7 @@ function getSupabaseClient() {
 }
 
 // Local whitelist fallback persistence path
-const whitelistPath = path.join(process.cwd(), "authorized_admins_local.json");
+const whitelistPath = process.env.NETLIFY ? path.join("/tmp", "authorized_admins_local.json") : path.join(process.cwd(), "authorized_admins_local.json");
 
 // Preloaded trusted default emails
 const DEFAULT_WHITELIST = [
@@ -48,7 +48,11 @@ async function ensureLocalWhitelistFile() {
   try {
     await fs.access(whitelistPath);
   } catch {
-    await fs.writeFile(whitelistPath, JSON.stringify(DEFAULT_WHITELIST, null, 2), "utf-8");
+    try {
+      await fs.writeFile(whitelistPath, JSON.stringify(DEFAULT_WHITELIST, null, 2), "utf-8");
+    } catch (e) {
+      console.warn("Could not write whitelist file (expected in read-only serverless):", e);
+    }
   }
 }
 
@@ -159,7 +163,7 @@ if (process.env.SMTP_HOST && process.env.SMTP_HOST.includes('@')) {
 const otpStore = new Map<string, { otp: string, timestamp: number }>();
 
 // --- UNIFIED PERSISTENT DATABASE ENGINE ---
-const dataStorePath = path.join(process.cwd(), "data_store.json");
+const dataStorePath = process.env.NETLIFY ? path.join("/tmp", "data_store.json") : path.join(process.cwd(), "data_store.json");
 
 const DEFAULT_STORE = {
   restaurants: [],
@@ -211,7 +215,11 @@ async function ensureDataStoreFile() {
   try {
     await fs.access(dataStorePath);
   } catch {
-    await fs.writeFile(dataStorePath, JSON.stringify(DEFAULT_STORE, null, 2), "utf-8");
+    try {
+      await fs.writeFile(dataStorePath, JSON.stringify(DEFAULT_STORE, null, 2), "utf-8");
+    } catch (e) {
+      console.warn("Could not write datastore file:", e);
+    }
   }
 }
 
@@ -461,15 +469,19 @@ async function startServer() {
 
   // Whitelist/Check-Authorized endpoints
   app.post("/api/auth/check-authorized", async (req, res) => {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "Email required" });
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email required" });
+      }
+      const isAuthorized = await isEmailAuthorized(email);
+      if (!isAuthorized) {
+        return res.status(403).json({ error: "Not Registered" });
+      }
+      res.json({ authorized: true });
+    } catch (err: any) {
+      res.status(500).json({ error: "Server error", details: err?.message });
     }
-    const isAuthorized = await isEmailAuthorized(email);
-    if (!isAuthorized) {
-      return res.status(403).json({ error: "Not Registered" });
-    }
-    res.json({ authorized: true });
   });
 
   // Whitelist management endpoints (for Super Admin dashboard controls)
@@ -641,94 +653,102 @@ async function startServer() {
 
   // OTP Endpoints with strict access checks
   app.post("/api/auth/send-otp", async (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email required" });
-    
-    // Strict block on direct sign-ups / reset requests for unregistered users
-    const isAuthorized = await isEmailAuthorized(email);
-    if (!isAuthorized) {
-      return res.status(403).json({ error: "Not Registered" });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore.set(email, { otp, timestamp: Date.now() });
-    
     try {
-        const template = await fs.readFile(path.join(process.cwd(), 'src', 'templates', 'otp-email.html'), 'utf-8').catch(() => "Your verification code is: {OTP_CODE}");
-        const html = template.replace('{OTP_CODE}', otp);
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ error: "Email required" });
+      
+      // Strict block on direct sign-ups / reset requests for unregistered users
+      const isAuthorized = await isEmailAuthorized(email);
+      if (!isAuthorized) {
+        return res.status(403).json({ error: "Not Registered" });
+      }
 
-        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-          console.warn(`[AUTH] SMTP NOT CONFIGURED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
-          return res.json({ message: "Code transmitted (Mock mode - Check server logs)", otp });
-        }
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      otpStore.set(email, { otp, timestamp: Date.now() });
+      
+      const template = await fs.readFile(path.join(process.cwd(), 'src', 'templates', 'otp-email.html'), 'utf-8').catch(() => "Your verification code is: {OTP_CODE}");
+      const html = template.replace('{OTP_CODE}', otp);
 
-        await transporter.sendMail({
-            from: '"Googly Admin" <no-reply@googly-app.com>',
-            to: email,
-            subject: "Your Googly Verification Code",
-            text: `Your verification code is: ${otp}. It is valid for 5 minutes.`,
-            html: html,
-        });
-        console.log(`[AUTH] Email sent successfully to ${email}`);
-        res.json({ message: "OTP transmitted successfully." });
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.warn(`[AUTH] SMTP NOT CONFIGURED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
+        return res.json({ message: "Code transmitted (Mock mode - Check server logs)", otp });
+      }
+
+      await transporter.sendMail({
+          from: '"Googly Admin" <no-reply@googly-app.com>',
+          to: email,
+          subject: "Your Googly Verification Code",
+          text: `Your verification code is: ${otp}. It is valid for 5 minutes.`,
+          html: html,
+      });
+      console.log(`[AUTH] Email sent successfully to ${email}`);
+      res.json({ message: "OTP transmitted successfully." });
     } catch (err: any) {
-        console.error("Email delivery failed:", err);
-        // Fallback for previewing without SMTP
-        console.warn(`[AUTH] SMTP FAILED. MOCKING OTP SENDING TO: ${email}. CODE: ${otp}`);
-        res.json({ message: "Code transmitted (Fallback Mode - Check server logs)", otp });
+      console.error("Email delivery failed or error in send-otp:", err);
+      res.status(500).json({ error: "An interval server error occurred", details: err?.message });
     }
   });
 
   app.post("/api/auth/verify-otp", async (req, res) => {
-    const { email, otp } = req.body;
-    if (!email) return res.status(400).json({ error: "Email is required" });
+    try {
+      const { email, otp } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
 
-    // Strict validation
-    const isAuthorized = await isEmailAuthorized(email);
-    if (!isAuthorized) {
-      return res.status(403).json({ error: "Not Registered" });
-    }
+      // Strict validation
+      const isAuthorized = await isEmailAuthorized(email);
+      if (!isAuthorized) {
+        return res.status(403).json({ error: "Not Registered" });
+      }
 
-    const stored = otpStore.get(email);
-    if (stored && stored.otp === otp && (Date.now() - stored.timestamp < 300000)) {
-      res.json({ success: true, message: "Identity verified." });
-    } else {
-      res.status(400).json({ success: false, error: "Invalid or expired OTP code." });
+      const stored = otpStore.get(email);
+      if (stored && stored.otp === otp && (Date.now() - stored.timestamp < 300000)) {
+        res.json({ success: true, message: "Identity verified." });
+      } else {
+        res.status(400).json({ success: false, error: "Invalid or expired OTP code." });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: "Server error", details: err?.message });
     }
   });
 
   app.post("/api/auth/reset-password", async (req, res) => {
-    const { email, newPassword, otp } = req.body;
-    if (!email) return res.status(400).json({ error: "Email is required" });
-
-    // Strict validation
-    const isAuthorized = await isEmailAuthorized(email);
-    if (!isAuthorized) {
-      return res.status(403).json({ error: "Not Registered" });
-    }
-
-    const stored = otpStore.get(email);
-    if (!stored || stored.otp !== otp) {
-      return res.status(401).json({ error: "Verification mismatch." });
-    }
-
     try {
-      console.log(`[AUTH] Password for ${email} would be reset to: ${newPassword}`);
-      
-      // Update the user's password in Firebase Auth via Admin SDK if available
-      try {
-        const user = await (admin as any).auth().getUserByEmail(email);
-        await (admin as any).auth().updateUser(user.uid, { password: newPassword });
-        console.log(`[AUTH] Firebase Password for ${email} updated successfully via Admin SDK.`);
-      } catch (authErr: any) {
-        console.warn("[AUTH] Failed to update password in Firebase Auth via Admin SDK (this is normal if Firebase Admin credentials are not fully configured yet):", authErr.message);
+      const { email, newPassword, otp } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+
+      // Strict validation
+      const isAuthorized = await isEmailAuthorized(email);
+      if (!isAuthorized) {
+        return res.status(403).json({ error: "Not Registered" });
       }
 
-      otpStore.delete(email);
-      res.json({ success: true, message: "Security update complete." });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const stored = otpStore.get(email);
+      if (!stored || stored.otp !== otp) {
+        return res.status(401).json({ error: "Verification mismatch." });
+      }
+
+      try {
+        console.log(`[AUTH] Password for ${email} would be reset to: ${newPassword}`);
+        
+        // Update the user's password in Firebase Auth via Admin SDK if available
+        try {
+          const user = await (admin as any).auth().getUserByEmail(email);
+          await (admin as any).auth().updateUser(user.uid, { password: newPassword });
+          console.log(`[AUTH] Firebase Password for ${email} updated successfully via Admin SDK.`);
+        } catch (authErr: any) {
+          console.warn("[AUTH] Failed to update password in Firebase Auth via Admin SDK (this is normal if Firebase Admin credentials are not fully configured yet):", authErr.message);
+        }
+
+        otpStore.delete(email);
+        res.json({ success: true, message: "Security update complete." });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: "Server error", details: err?.message });
     }
   });
 
-startServer();
+if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  startServer();
+}
