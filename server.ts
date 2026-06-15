@@ -749,6 +749,7 @@ async function startServer() {
     }
   });
 
-if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+const isServerlessEnvironment = process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.SERVERLESS;
+if (!isServerlessEnvironment) {
   startServer();
 }
