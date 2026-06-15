@@ -771,7 +771,8 @@ async function startServer() {
     }
   });
 
-  // Mount the apiRouter under both "/api" (local dev) and "/" (serverless base path stripping fallback)
+  // Mount the apiRouter under all possible path prefixes for local dev and Netlify serverless deployment
+  app.use("/.netlify/functions/api", apiRouter);
   app.use("/api", apiRouter);
   app.use("/", apiRouter);
 
