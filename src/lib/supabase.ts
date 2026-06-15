@@ -20,12 +20,9 @@ export function getSupabase(): SupabaseClient {
     if (!isValidUrl(supabaseUrl) || !supabaseAnonKey) {
       console.warn("Supabase credentials missing or invalid. Check environment variables.");
       // Fallback to placeholder if not configured to prevent crashes, but warn the user
-      _supabase = createClient(
-        isValidUrl(supabaseUrl) ? supabaseUrl : "http://localhost:54321",
-        supabaseAnonKey || "placeholder"
-      );
+      _supabase = createClient(isValidUrl(supabaseUrl) ? supabaseUrl : "http://localhost:54321", supabaseAnonKey || "placeholder", { auth: { flowType: 'pkce', persistSession: true, storage: typeof window !== 'undefined' ? window.localStorage : undefined } });
     } else {
-      _supabase = createClient(supabaseUrl, supabaseAnonKey);
+      _supabase = createClient(supabaseUrl, supabaseAnonKey, { auth: { flowType: 'pkce', persistSession: true, storage: typeof window !== 'undefined' ? window.localStorage : undefined } });
     }
   }
   return _supabase;

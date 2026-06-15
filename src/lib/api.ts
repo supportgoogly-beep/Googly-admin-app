@@ -17,8 +17,6 @@ export const getApiUrl = (url: string) => url;
 export const fetchWrapper = async (url: string, options?: RequestInit) => {
   const res = await fetch(url, options);
   const contentType = res.headers.get("content-type");
-  if (contentType && contentType.includes("text/html")) {
-    throw new Error("Application access blocked by browser privacy settings. Please open the app in a new tab or enable cookies.");
-  }
+  
   return res;
 };
