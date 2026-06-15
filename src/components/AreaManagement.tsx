@@ -1,3 +1,4 @@
+import { fetchWrapper } from "../lib/api";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -248,7 +249,7 @@ export default function AreaManagement() {
 
     // Step 1: Try India Post Pincode API
     try {
-      const postalRes = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+      const postalRes = await fetchWrapper(`https://api.postalpincode.in/pincode/${pincode}`);
       const postalData = await postalRes.json();
 
       if (
@@ -282,7 +283,7 @@ export default function AreaManagement() {
 
         // Query 1: Post Office name, district, state, India
         try {
-          const geoRes = await fetch(
+          const geoRes = await fetchWrapper(
             `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
               `${po.Name}, ${po.District}, ${po.State}, India`
             )}&format=json&limit=1&addressdetails=1`
@@ -298,7 +299,7 @@ export default function AreaManagement() {
         // Query 2: Pincode District State India
         if (!matchResult) {
           try {
-            const geoRes = await fetch(
+            const geoRes = await fetchWrapper(
               `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
                 `${pincode} ${po.District} ${po.State} India`
               )}&format=json&limit=1&addressdetails=1`
@@ -315,7 +316,7 @@ export default function AreaManagement() {
         // Query 3: District, State, India
         if (!matchResult) {
           try {
-            const geoRes = await fetch(
+            const geoRes = await fetchWrapper(
               `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
                 `${po.District}, ${po.State}, India`
               )}&format=json&limit=1&addressdetails=1`
@@ -332,7 +333,7 @@ export default function AreaManagement() {
         // Query 4: State, India
         if (!matchResult) {
           try {
-            const geoRes = await fetch(
+            const geoRes = await fetchWrapper(
               `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
                 `${po.State}, India`
               )}&format=json&limit=1&addressdetails=1`
@@ -368,14 +369,14 @@ export default function AreaManagement() {
     // Step 2: Fallback to direct OSM Nominatim lookup if Postal API fails or does not find it
     if (!isPostalApiOk) {
       try {
-        let res = await fetch(
+        let res = await fetchWrapper(
           `https://nominatim.openstreetmap.org/search?postalcode=${pincode}&countrycodes=in&format=json&addressdetails=1`,
         );
         let data = await res.json();
 
         // Fallback to general query if postalcode explicit search fails (OSM quirk)
         if (!data || data.length === 0) {
-          res = await fetch(
+          res = await fetchWrapper(
             `https://nominatim.openstreetmap.org/search?q=${pincode}+India&format=json&addressdetails=1`,
           );
           data = await res.json();
@@ -415,7 +416,7 @@ export default function AreaManagement() {
     setSuccessMsg("");
 
     try {
-      const res = await fetch(
+      const res = await fetchWrapper(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
       );
       const data = await res.json();

@@ -1,11 +1,11 @@
 
 export async function fetchData() {
-  const res = await fetch("/api/data/load");
+  const res = await fetchWrapper("/api/data/load");
   return res.json();
 }
 
 export async function publishEvent(event: string, table: string, row: any, rowId: string) {
-  await fetch("/api/realtime/publish", {
+  await fetchWrapper("/api/realtime/publish", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ event, table, row, rowId, origin: "client" }),
@@ -13,3 +13,12 @@ export async function publishEvent(event: string, table: string, row: any, rowId
 }
 
 export const getApiUrl = (url: string) => url;
+
+export const fetchWrapper = async (url: string, options?: RequestInit) => {
+  const res = await fetch(url, options);
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("text/html")) {
+    throw new Error("Application access blocked by browser privacy settings. Please open the app in a new tab or enable cookies.");
+  }
+  return res;
+};

@@ -36,7 +36,7 @@ import { login, register, logout, resetPassword, syncUserWithSupabase, getUserPr
 import { auth } from "./lib/firebase";
 import { CityProvider, useCityContext } from "./context/CityContext";
 import { useSupabaseCollection } from "./hooks/useSupabase";
-import { getApiUrl } from "./lib/api";
+import { getApiUrl, fetchWrapper } from "./lib/api";
 
 interface Toast {
   id: string;
@@ -194,7 +194,7 @@ function AppContent() {
         // Enforce the "Admins Only" pre-authentication whitelist check
         let isAuthorized = false;
         try {
-          const checkRes = await fetch(getApiUrl("/api/auth/check-authorized"), {
+          const checkRes = await fetchWrapper(getApiUrl("/api/auth/check-authorized"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: authEmail })
@@ -274,7 +274,7 @@ function AppContent() {
         throw new Error("This email is not registered in the Googly master directory.");
       }
 
-      const res = await fetch(getApiUrl("/api/auth/send-otp"), {
+      const res = await fetchWrapper(getApiUrl("/api/auth/send-otp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -297,7 +297,7 @@ function AppContent() {
 
   const handleVerifyOTP = async (email: string, otp: string) => {
     try {
-      const res = await fetch(getApiUrl("/api/auth/verify-otp"), {
+      const res = await fetchWrapper(getApiUrl("/api/auth/verify-otp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp })
@@ -314,7 +314,7 @@ function AppContent() {
 
   const handleResetPassword = async (email: string, newPass: string, otp: string) => {
     try {
-      const res = await fetch(getApiUrl("/api/auth/reset-password"), {
+      const res = await fetchWrapper(getApiUrl("/api/auth/reset-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, newPassword: newPass, otp })

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useCityContext } from "../context/CityContext";
-import { getApiUrl } from "../lib/api";
+import { getApiUrl, fetchWrapper } from "../lib/api";
 import {
   Shield, ShieldAlert, ShieldCheck, Key, Lock, Users, UserPlus, Search, Filter,
   Edit, Edit3, Trash2, Check, X, Info, AlertTriangle, AlertCircle, Copy, HelpCircle,
@@ -451,7 +451,7 @@ export default function RbacSettingsDashboard({
   const fetchWhitelist = async () => {
     try {
       setWhitelistLoading(true);
-      const res = await fetch(getApiUrl("/api/auth/whitelist"));
+      const res = await fetchWrapper(getApiUrl("/api/auth/whitelist"));
       if (res.ok) {
         const data = await res.json();
         setAuthorizedEmails(data);
@@ -476,7 +476,7 @@ export default function RbacSettingsDashboard({
       return;
     }
     try {
-      const res = await fetch(getApiUrl("/api/auth/whitelist"), {
+      const res = await fetchWrapper(getApiUrl("/api/auth/whitelist"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -496,7 +496,7 @@ export default function RbacSettingsDashboard({
 
   const handleRemoveAuthEmail = async (email: string) => {
     try {
-      const res = await fetch(getApiUrl(`/api/auth/whitelist?email=${encodeURIComponent(email)}`), {
+      const res = await fetchWrapper(getApiUrl(`/api/auth/whitelist?email=${encodeURIComponent(email)}`), {
         method: "DELETE"
       });
       const data = await res.json();
@@ -680,14 +680,6 @@ export default function RbacSettingsDashboard({
 
   // Execute Final Creation & Activation
   const handleConfirmActivation = async (statusOverride?: RbacStaff["status"]) => {
-    // Security check: Only the owner in registry can perform this
-    const ownerEmail = "ruhandharpurkayastha@gmail.com";
-    if (currentUserEmail?.toLowerCase() !== ownerEmail) {
-      triggerToast("Permission Blocked", "Your credentials do not permit modifying the master organizational registry.", "error");
-      setShowConfirmationModal(false);
-      return;
-    }
-
     setShowConfirmationModal(false);
     setShowAddStaffPanel(false);
 

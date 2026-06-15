@@ -8,7 +8,6 @@ import { promises as fs } from "fs";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Configuration for file uploads
 const upload = multer({
@@ -36,7 +35,8 @@ function getSupabaseClient() {
 }
 
 // Local whitelist fallback persistence path
-const whitelistPath = process.env.NETLIFY ? path.join("/tmp", "authorized_admins_local.json") : path.join(process.cwd(), "authorized_admins_local.json");
+const isServerless = process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.SERVERLESS;
+const whitelistPath = isServerless ? path.join("/tmp", "authorized_admins_local.json") : path.join(process.cwd(), "authorized_admins_local.json");
 
 // Preloaded trusted default emails
 const DEFAULT_WHITELIST = [
@@ -163,7 +163,7 @@ if (process.env.SMTP_HOST && process.env.SMTP_HOST.includes('@')) {
 const otpStore = new Map<string, { otp: string, timestamp: number }>();
 
 // --- UNIFIED PERSISTENT DATABASE ENGINE ---
-const dataStorePath = process.env.NETLIFY ? path.join("/tmp", "data_store.json") : path.join(process.cwd(), "data_store.json");
+const dataStorePath = isServerless ? path.join("/tmp", "data_store.json") : path.join(process.cwd(), "data_store.json");
 
 const DEFAULT_STORE = {
   restaurants: [],

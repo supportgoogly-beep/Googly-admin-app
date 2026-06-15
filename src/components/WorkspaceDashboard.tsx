@@ -1,3 +1,4 @@
+import { fetchWrapper } from "../lib/api";
 import React, { useState, useEffect } from "react";
 import { 
   FileSpreadsheet, FileText, FolderOpen, Database, Plus, Search, Trash2, 
@@ -236,7 +237,7 @@ export default function WorkspaceDashboard({
       // 1. If 'new' sheet is requested, create a brand-new Spreadsheet file first
       if (sheetMode === "new") {
         const title = `Googly ${exportSource.toUpperCase()} Export - ${new Date().toLocaleDateString()}`;
-        const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+        const createRes = await fetchWrapper("https://sheets.googleapis.com/v4/spreadsheets", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -305,7 +306,7 @@ export default function WorkspaceDashboard({
       const sheetDataPayload = [headers, ...rows];
 
       // 4. Update the cells in the target spreadsheet using A1 RAW notation
-      const updateRes = await fetch(
+      const updateRes = await fetchWrapper(
         `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${targetRange}?valueInputOption=RAW`,
         {
           method: "PUT",
@@ -371,7 +372,7 @@ export default function WorkspaceDashboard({
 
     try {
       // 1. Create a brand-new blank document
-      const createRes = await fetch("https://docs.googleapis.com/v1/documents", {
+      const createRes = await fetchWrapper("https://docs.googleapis.com/v1/documents", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -434,7 +435,7 @@ export default function WorkspaceDashboard({
       ];
 
       // Execute batch writes
-      const updateRes = await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
+      const updateRes = await fetchWrapper(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -493,7 +494,7 @@ export default function WorkspaceDashboard({
 
       const url = `https://www.googleapis.com/drive/v3/files?pageSize=25&fields=files(id,name,mimeType,webViewLink,createdTime,size)&q=${encodeURIComponent(q)}&orderBy=createdTime%20desc`;
       
-      const res = await fetch(url, {
+      const res = await fetchWrapper(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -537,7 +538,7 @@ export default function WorkspaceDashboard({
     }
 
     try {
-      const res = await fetch("https://www.googleapis.com/drive/v3/files", {
+      const res = await fetchWrapper("https://www.googleapis.com/drive/v3/files", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -628,7 +629,7 @@ export default function WorkspaceDashboard({
         fileContentString +
         closeDelim;
 
-      const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+      const res = await fetchWrapper("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -667,7 +668,7 @@ export default function WorkspaceDashboard({
     }
 
     try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      const res = await fetchWrapper(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });

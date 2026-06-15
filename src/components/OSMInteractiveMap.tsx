@@ -1,3 +1,4 @@
+import { fetchWrapper } from "../lib/api";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -1081,7 +1082,7 @@ export default function OSMInteractiveMap({
 
     try {
       // Proxy Nominatim through backend to comply with platform usage policies
-      const response = await fetch(
+      const response = await fetchWrapper(
         `/api/proxy-nominatim?q=${encodeURIComponent(
           searchQuery + ", Kolkata", // Scoped to Kolkata region for delivery platform relevance
         )}`,

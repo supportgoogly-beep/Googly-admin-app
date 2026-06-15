@@ -1,3 +1,4 @@
+import { fetchWrapper } from "../lib/api";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Plus,
@@ -417,7 +418,7 @@ export default function GeofencingManagementSystem({
       "info",
     );
     try {
-      const res = await fetch(
+      const res = await fetchWrapper(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
       );
       const data = await res.json();
