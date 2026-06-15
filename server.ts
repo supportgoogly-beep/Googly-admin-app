@@ -302,6 +302,27 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Normalize incoming API paths for both local development (/api/...) and serverless (/netlify/functions...)
+app.use((req, res, next) => {
+  const originalUrl = req.url;
+  
+  // Strip Netlify Functions prefix
+  if (req.url.startsWith("/.netlify/functions/api")) {
+    req.url = req.url.slice("/.netlify/functions/api".length);
+  } 
+  // Strip standard /api prefix
+  else if (req.url.startsWith("/api")) {
+    req.url = req.url.slice("/api".length);
+  }
+  
+  // Ensure the rewritten URL has a leading slash
+  if (!req.url.startsWith("/")) {
+    req.url = "/" + req.url;
+  }
+  
+  next();
+});
+
 async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
